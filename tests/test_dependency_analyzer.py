@@ -1,5 +1,4 @@
 """Tests for the dependency analyzer."""
-import pytest
 from pathlib import Path
 
 from saar.dependency_analyzer import DependencyAnalyzer

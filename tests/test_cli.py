@@ -1,5 +1,4 @@
 """Tests for the CLI interface."""
-import pytest
 from pathlib import Path
 from typer.testing import CliRunner
 

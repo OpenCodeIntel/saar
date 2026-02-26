@@ -164,7 +164,8 @@ class StyleAnalyzer:
 
         total_func = len(function_names)
         total_cls = len(class_names)
-        pct = lambda n, d: f"{n / d * 100:.0f}%" if d > 0 else "0%"
+        def pct(n: int, d: int) -> str:
+            return f"{n / d * 100:.0f}%" if d > 0 else "0%"
 
         return {
             "summary": {

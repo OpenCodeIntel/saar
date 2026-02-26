@@ -1,5 +1,4 @@
 """Tests for the style analyzer."""
-import pytest
 from pathlib import Path
 
 from saar.style_analyzer import StyleAnalyzer

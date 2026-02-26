@@ -1,5 +1,4 @@
 """Tests for the DNA extractor engine."""
-import pytest
 from pathlib import Path
 
 from saar.extractor import DNAExtractor
