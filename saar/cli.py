@@ -5,6 +5,7 @@ Usage:
     saar ./my-repo --format claude      # generate CLAUDE.md
     saar ./my-repo --format all         # generate all config files
     saar ./my-repo -o ./output/         # write to directory
+    saar ./my-repo --format claude --force  # overwrite existing files
 """
 import logging
 from enum import Enum
@@ -60,6 +61,11 @@ def extract(
         "--output", "-o",
         help="Output directory. Defaults to stdout for markdown, repo root for config files.",
     ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Overwrite existing config files. Without this, existing files are skipped.",
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose", "-v",
@@ -102,8 +108,9 @@ def extract(
         target = _resolve_output_path(fmt, output, repo_path)
 
         if target is None:
-            # stdout
             console.print(text)
+        elif target.exists() and not force:
+            console.print(f"  [yellow]skipped[/yellow] {target} (exists, use --force to overwrite)")
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(text, encoding="utf-8")
@@ -125,7 +132,6 @@ def _resolve_output_path(
     filename = filenames.get(fmt)
 
     if filename is None:
-        # markdown goes to stdout unless -o is given
         if output_dir:
             return output_dir / "saar-dna.md"
         return None

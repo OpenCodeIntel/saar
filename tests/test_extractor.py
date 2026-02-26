@@ -66,8 +66,80 @@ class TestDNAExtractor:
     def test_detects_common_imports(self, tmp_repo: Path):
         extractor = DNAExtractor()
         dna = extractor.extract(str(tmp_repo))
-        # logging is imported in 2+ files
         assert any("logging" in imp for imp in dna.common_imports)
+
+
+class TestFileClassification:
+    """Test that app code and test code are separated correctly."""
+
+    def test_separates_app_and_test_files(self, tmp_repo: Path):
+        """_discover_files should split files into app and test lists."""
+        extractor = DNAExtractor()
+        app_files, test_files = extractor._discover_files(tmp_repo)
+        app_names = {f.name for f in app_files}
+        test_names = {f.name for f in test_files}
+        assert "main.py" in app_names
+        assert "user_service.py" in app_names
+        assert "test_main.py" in test_names
+        assert "conftest.py" in test_names
+
+    def test_no_false_positives_from_test_fixtures(self, tmp_path: Path):
+        """Patterns in test fixtures should not appear in extraction."""
+        # app code -- plain Python, no frameworks
+        (tmp_path / "app.py").write_text(
+            "import logging\n\n"
+            "logger = logging.getLogger(__name__)\n\n"
+            "def main():\n"
+            "    logger.info('starting')\n"
+        )
+        # test file that mentions Flask -- should NOT trigger flask detection
+        tests = tmp_path / "tests"
+        tests.mkdir()
+        (tests / "__init__.py").write_text("")
+        (tests / "test_app.py").write_text(
+            "from flask import Flask\n"
+            "from flask_login import login_required\n\n"
+            "def test_something():\n"
+            "    assert True\n"
+        )
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna is not None
+        # Should NOT detect flask -- it's only in test code
+        assert dna.detected_framework is None
+        assert "flask_login" not in dna.auth_patterns.middleware_used
+
+    def test_no_false_positives_from_string_literals(self, tmp_path: Path):
+        """String mentions of frameworks should not trigger detection."""
+        (tmp_path / "formatter.py").write_text(
+            "import logging\n\n"
+            "def format_output():\n"
+            "    return 'This project uses from fastapi import FastAPI'\n"
+        )
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna is not None
+        # "from fastapi" is inside a string, not a real import
+        assert dna.detected_framework is None
+
+    def test_dataclass_not_detected_as_exception(self, tmp_path: Path):
+        """Pattern dataclasses like ErrorPattern should not be listed as exceptions."""
+        (tmp_path / "models.py").write_text(
+            "from dataclasses import dataclass\n\n"
+            "@dataclass\n"
+            "class ErrorPattern:\n"
+            "    message: str = ''\n\n"
+            "class AppError(Exception):\n"
+            "    pass\n"
+        )
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna is not None
+        assert "AppError" in dna.error_patterns.exception_classes
+        assert "ErrorPattern" not in dna.error_patterns.exception_classes
 
 
 class TestExtractorEdgeCases:
@@ -84,7 +156,6 @@ class TestExtractorEdgeCases:
         assert dna is None
 
     def test_skips_node_modules(self, tmp_path: Path):
-        """Files inside node_modules should be ignored."""
         nm = tmp_path / "node_modules" / "somelib"
         nm.mkdir(parents=True)
         (nm / "index.js").write_text("export default function() {}")
@@ -93,11 +164,9 @@ class TestExtractorEdgeCases:
         extractor = DNAExtractor()
         dna = extractor.extract(str(tmp_path))
         assert dna is not None
-        # only app.py should be counted
         assert dna.language_distribution.get("javascript", 0) == 0
 
     def test_handles_binary_files(self, tmp_path: Path):
-        """Binary files should be skipped without crashing."""
         (tmp_path / "data.py").write_bytes(b"\x00\x01\x02\x03" * 100)
         (tmp_path / "real.py").write_text("x = 1")
 
@@ -106,9 +175,8 @@ class TestExtractorEdgeCases:
         assert dna is not None
 
     def test_respects_max_file_size(self, tmp_path: Path):
-        """Files over MAX_FILE_SIZE should be skipped."""
         big = tmp_path / "big.py"
-        big.write_text("x = 1\n" * 200_000)  # ~1.2MB
+        big.write_text("x = 1\n" * 200_000)
 
         extractor = DNAExtractor()
         dna = extractor.extract(str(tmp_path))

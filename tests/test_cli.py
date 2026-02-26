@@ -66,3 +66,18 @@ class TestCLI:
     def test_verbose_flag(self, tmp_repo: Path):
         result = runner.invoke(app, [str(tmp_repo), "--verbose"])
         assert result.exit_code == 0
+
+    def test_skips_existing_without_force(self, tmp_repo: Path):
+        """Should not overwrite existing CLAUDE.md without --force."""
+        existing = tmp_repo / "CLAUDE.md"
+        original = existing.read_text()
+        result = runner.invoke(app, [str(tmp_repo), "--format", "claude"])
+        assert result.exit_code == 0
+        assert "skipped" in result.stdout
+        assert existing.read_text() == original
+
+    def test_force_overwrites(self, tmp_repo: Path):
+        """--force should overwrite existing files."""
+        result = runner.invoke(app, [str(tmp_repo), "--format", "claude", "--force"])
+        assert result.exit_code == 0
+        assert "wrote" in result.stdout

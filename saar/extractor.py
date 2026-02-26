@@ -4,16 +4,18 @@ Analyzes a codebase using tree-sitter AST parsing and pattern
 matching to extract architectural patterns, conventions, and
 constraints. This is the heart of Saar.
 
-File is >200 lines because all extraction methods form a single
-cohesive pipeline. Candidate for splitting into per-category
-analyzers in a future refactor.
+Key design decisions:
+- Separates app code from test/template code to avoid false positives
+- Pattern matching targets line-start positions to skip string literals
+- File cache avoids re-reading files across extraction methods
+- File is >200 lines because all methods form one cohesive pipeline
 """
 import logging
 import re
 import time
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import tree_sitter_python as tspython
 import tree_sitter_javascript as tsjavascript
@@ -33,6 +35,12 @@ from saar.models import (
 
 logger = logging.getLogger(__name__)
 
+# Directories that contain tests, not application code
+_TEST_DIRS = {"tests", "test", "testing", "spec", "specs", "__tests__"}
+
+# Files that are test files by naming convention
+_TEST_PATTERNS = re.compile(r"^(test_|_test\.py|spec_|_spec\.)")
+
 
 class DNAExtractor:
     """Extracts architectural DNA from a codebase.
@@ -48,7 +56,6 @@ class DNAExtractor:
     MAX_FILE_SIZE = 1024 * 1024  # 1MB
     MAX_FILES = 5000
 
-    # Team rules files in priority order (first found wins)
     RULES_FILES = [
         "CLAUDE.md",
         ".cursorrules",
@@ -70,7 +77,6 @@ class DNAExtractor:
     # -- file I/O ---------------------------------------------------------
 
     def _reset_cache(self) -> None:
-        """Clear file cache between extractions."""
         self._file_cache.clear()
         self._stats = {"files_read": 0, "files_skipped": 0, "read_errors": 0}
 
@@ -96,7 +102,6 @@ class DNAExtractor:
                 self._stats["read_errors"] += 1
                 return None
 
-            # binary content check (null bytes)
             if "\x00" in content[:1024]:
                 self._stats["files_skipped"] += 1
                 return None
@@ -110,9 +115,29 @@ class DNAExtractor:
             self._stats["read_errors"] += 1
             return None
 
-    def _discover_files(self, repo_path: Path) -> List[Path]:
-        """Find all code files, skipping irrelevant directories."""
-        files: List[Path] = []
+    # -- file discovery and classification --------------------------------
+
+    @staticmethod
+    def _is_test_file(file_path: Path) -> bool:
+        """Check if a file is a test file by directory or naming convention."""
+        if any(d in _TEST_DIRS for d in file_path.parts):
+            return True
+        if _TEST_PATTERNS.match(file_path.name):
+            return True
+        if file_path.name == "conftest.py":
+            return True
+        return False
+
+    def _discover_files(self, repo_path: Path) -> Tuple[List[Path], List[Path]]:
+        """Find code files, split into app files and test files.
+
+        Returns:
+            Tuple of (app_files, test_files). Pattern detection runs
+            only on app_files to avoid false positives from test
+            fixtures and template strings.
+        """
+        app_files: List[Path] = []
+        test_files: List[Path] = []
         extensions = {".py", ".js", ".jsx", ".ts", ".tsx", ".sql"}
 
         try:
@@ -120,29 +145,31 @@ class DNAExtractor:
                 if item.is_symlink():
                     continue
                 if item.is_file() and item.suffix in extensions:
-                    if not any(skip in item.parts for skip in self.SKIP_DIRS):
-                        files.append(item)
-                        if len(files) >= self.MAX_FILES:
-                            logger.warning("Hit max file limit (%d)", self.MAX_FILES)
-                            break
+                    if any(skip in item.parts for skip in self.SKIP_DIRS):
+                        continue
+                    total = len(app_files) + len(test_files)
+                    if total >= self.MAX_FILES:
+                        logger.warning("Hit max file limit (%d)", self.MAX_FILES)
+                        break
+                    if self._is_test_file(item):
+                        test_files.append(item)
+                    else:
+                        app_files.append(item)
         except Exception as e:
             logger.error("Error discovering files: %s", e)
 
-        return files
+        return app_files, test_files
 
     def _detect_language(self, file_path: str) -> str:
         ext = Path(file_path).suffix.lower()
         return {
-            ".py": "python",
-            ".js": "javascript",
-            ".jsx": "javascript",
-            ".ts": "typescript",
-            ".tsx": "typescript",
+            ".py": "python", ".js": "javascript", ".jsx": "javascript",
+            ".ts": "typescript", ".tsx": "typescript",
         }.get(ext, "unknown")
 
     # -- team rules -------------------------------------------------------
 
-    def _extract_team_rules(self, repo_path: Path) -> tuple[Optional[str], Optional[str]]:
+    def _extract_team_rules(self, repo_path: Path) -> Tuple[Optional[str], Optional[str]]:
         """Find and read team convention files (CLAUDE.md, .cursorrules, etc.)."""
         for filename in self.RULES_FILES:
             rules_path = repo_path / filename
@@ -156,25 +183,41 @@ class DNAExtractor:
     # -- framework detection ----------------------------------------------
 
     def _detect_framework(self, files: List[Path]) -> Optional[str]:
-        """Detect the primary framework by counting indicator strings."""
-        indicators = {
-            "fastapi": ["from fastapi", "FastAPI()", "APIRouter"],
-            "django-rest-framework": ["from rest_framework", "APIView", "ViewSet"],
-            "django": ["from django", "django.conf", "INSTALLED_APPS"],
-            "flask": ["from flask", "Flask(__name__)", "@app.route"],
-            "express": ['require("express")', "express()", "express.Router"],
-            "nextjs": ["getServerSideProps", "getStaticProps", "next/router"],
-            "nestjs": ["@Module(", "@Injectable(", "@Controller("],
+        """Detect primary framework from actual imports.
+
+        Python indicators only checked in .py files, JS/TS indicators
+        only in .js/.ts/.jsx/.tsx. All line-start anchored to avoid
+        matching string literals in formatters or templates.
+        """
+        py_indicators = {
+            "fastapi": [r"^from fastapi\b", r"^import fastapi\b"],
+            "django-rest-framework": [r"^from rest_framework\b"],
+            "django": [r"^from django\b", r"^import django\b"],
+            "flask": [r"^from flask\b", r"^import flask\b"],
         }
+        js_indicators = {
+            "express": [r"^const\s+\w+\s*=\s*require\("],
+            "nextjs": [r"^import\s+.*from\s+.next/"],
+            "nestjs": [r"^import\s+.*from\s+.@nestjs/"],
+        }
+        py_exts = {".py"}
+        js_exts = {".js", ".jsx", ".ts", ".tsx"}
 
         scores: Counter = Counter()
         for file_path in files:
             content = self._safe_read_file(file_path)
             if not content:
                 continue
-            for framework, keywords in indicators.items():
-                for kw in keywords:
-                    if kw in content:
+            ext = file_path.suffix.lower()
+            if ext in py_exts:
+                active = py_indicators
+            elif ext in js_exts:
+                active = js_indicators
+            else:
+                continue
+            for framework, patterns in active.items():
+                for pattern in patterns:
+                    if re.search(pattern, content, re.MULTILINE):
                         scores[framework] += 1
 
         if not scores:
@@ -189,7 +232,11 @@ class DNAExtractor:
     def _extract_auth_patterns(
         self, files: List[Path], repo_path: Path, framework: Optional[str] = None
     ) -> AuthPattern:
-        """Detect auth middleware, decorators, and ownership checks."""
+        """Detect auth middleware, decorators, and ownership checks.
+
+        Uses line-start anchored patterns to avoid matching string
+        literals in formatters or templates.
+        """
         pattern = AuthPattern()
 
         for file_path in files:
@@ -199,37 +246,41 @@ class DNAExtractor:
             if not content:
                 continue
 
-            # FastAPI / Starlette
-            if "require_auth" in content:
+            # Only match real code patterns -- check function definitions
+            # and imports, not arbitrary string occurrences
+            if re.search(r"^def require_auth\b", content, re.MULTILINE):
                 pattern.middleware_used.append("require_auth")
-            if "public_auth" in content:
+            if re.search(r"^def public_auth\b", content, re.MULTILINE):
                 pattern.middleware_used.append("public_auth")
-            if "Depends(" in content and "auth" in content.lower():
-                pattern.auth_decorators.append("Depends(require_auth)")
-            if "AuthenticationMiddleware" in content:
+            if "Depends(" in content and re.search(r"^from fastapi", content, re.MULTILINE):
+                # only count Depends if this file actually imports from fastapi
+                deps = re.findall(r"Depends\((\w+)\)", content)
+                for dep in deps:
+                    if "auth" in dep.lower():
+                        pattern.auth_decorators.append(f"Depends({dep})")
+
+            if re.search(r"^from starlette.*AuthenticationMiddleware", content, re.MULTILINE):
                 pattern.middleware_used.append("AuthenticationMiddleware")
-            if "AuthCredentials" in content:
-                pattern.auth_context_type = "AuthCredentials"
+            if re.search(r"^class AuthContext\b", content, re.MULTILINE):
+                pattern.auth_context_type = "AuthContext"
 
-            # Flask
-            if "login_required" in content:
-                pattern.auth_decorators.append("@login_required")
-            if "flask_login" in content:
-                pattern.middleware_used.append("flask_login")
+            # Flask -- only if flask is actually imported
+            if re.search(r"^from flask", content, re.MULTILINE):
+                if "login_required" in content:
+                    pattern.auth_decorators.append("@login_required")
+                if "flask_login" in content:
+                    pattern.middleware_used.append("flask_login")
 
-            # Django
-            if "@login_required" in content:
-                pattern.auth_decorators.append("@login_required")
-            if "permission_required" in content:
-                pattern.auth_decorators.append("@permission_required")
-            if "request.user" in content:
-                pattern.auth_context_type = "request.user"
+            # Django -- only if django is actually imported
+            if re.search(r"^from django", content, re.MULTILINE):
+                if "@login_required" in content:
+                    pattern.auth_decorators.append("@login_required")
+                if "request.user" in content:
+                    pattern.auth_context_type = "request.user"
 
             # Ownership
-            if "verify_ownership" in content:
+            if re.search(r"^def verify_ownership\b", content, re.MULTILINE):
                 pattern.ownership_checks.append("verify_ownership")
-            if "AuthContext" in content:
-                pattern.auth_context_type = "AuthContext"
 
         pattern.middleware_used = list(set(pattern.middleware_used))
         pattern.auth_decorators = list(set(pattern.auth_decorators))
@@ -239,7 +290,6 @@ class DNAExtractor:
     def _extract_middleware_patterns(
         self, files: List[Path], framework: Optional[str]
     ) -> List[str]:
-        """Detect middleware registration patterns."""
         patterns: List[str] = []
 
         for file_path in files:
@@ -247,24 +297,17 @@ class DNAExtractor:
             if not content:
                 continue
 
-            if "class" in content and "Middleware" in content:
-                middlewares = re.findall(r"class\s+(\w*Middleware\w*)", content)
-                patterns.extend(middlewares)
+            # Real middleware class definitions
+            for match in re.finditer(r"^class\s+(\w*Middleware\w*)", content, re.MULTILINE):
+                patterns.append(match.group(1))
             if "app.add_middleware" in content:
                 patterns.append("app.add_middleware()")
-            if "Depends(" in content:
-                deps = re.findall(r"Depends\((\w+)\)", content)
-                for dep in deps:
-                    patterns.append(f"Depends({dep})")
             if "app.use(" in content:
                 patterns.append("app.use(middleware)")
-            if "permission_classes" in content:
-                patterns.append("DRF permission_classes")
 
         return list(set(patterns))
 
     def _extract_service_patterns(self, files: List[Path], repo_path: Path) -> ServicePattern:
-        """Detect service layer structure and DI patterns."""
         pattern = ServicePattern()
 
         deps_file = repo_path / "dependencies.py"
@@ -290,7 +333,6 @@ class DNAExtractor:
         return pattern
 
     def _extract_database_patterns(self, files: List[Path], repo_path: Path) -> DatabasePattern:
-        """Detect ORM, ID types, timestamps, RLS, and cascade behaviour."""
         pattern = DatabasePattern()
 
         for file_path in files:
@@ -298,17 +340,7 @@ class DNAExtractor:
             if not content:
                 continue
 
-            # ORM detection
-            if "supabase" in content.lower() and not pattern.orm_used:
-                pattern.orm_used = "Supabase"
-            if "from django.db import models" in content or "models.Model" in content:
-                pattern.orm_used = "Django ORM"
-            if "from sqlalchemy" in content:
-                pattern.orm_used = "SQLAlchemy"
-            if "prisma" in content.lower() or "@prisma/client" in content:
-                pattern.orm_used = "Prisma"
-
-            # SQL files give the most precise info
+            # SQL files -- most reliable source of DB patterns
             if file_path.suffix == ".sql":
                 if "gen_random_uuid()" in content:
                     pattern.id_type = "UUID (gen_random_uuid())"
@@ -322,20 +354,33 @@ class DNAExtractor:
                     pattern.has_rls = True
                 if "ON DELETE CASCADE" in content:
                     pattern.cascade_deletes = True
+                continue
 
-            # Python ORM field types
-            if file_path.suffix == ".py":
+            if file_path.suffix != ".py":
+                continue
+
+            # ORM detection -- require actual imports, not string mentions
+            if re.search(r"^from supabase\b|^import supabase\b|\.from_\(\s*['\"]supabase", content, re.MULTILINE):
+                pattern.orm_used = "Supabase"
+            # Supabase client usage is a strong signal even without direct import
+            if "supabase.client.table(" in content or "get_supabase_service()" in content:
+                pattern.orm_used = "Supabase"
+            if re.search(r"^from django\.db import models", content, re.MULTILINE):
+                pattern.orm_used = "Django ORM"
                 if "models.UUIDField" in content:
                     pattern.id_type = "UUID (Django UUIDField)"
                 if "on_delete=models.CASCADE" in content:
                     pattern.cascade_deletes = True
+            if re.search(r"^from sqlalchemy\b", content, re.MULTILINE):
+                pattern.orm_used = "SQLAlchemy"
                 if "create_engine(" in content:
                     pattern.connection_pattern = "SQLAlchemy: create_engine()"
+            if file_path.suffix in (".js", ".ts", ".tsx") and re.search(r"^import\b.*@prisma/client", content, re.MULTILINE):
+                pattern.orm_used = "Prisma"
 
         return pattern
 
     def _extract_error_patterns(self, files: List[Path]) -> ErrorPattern:
-        """Detect exception classes, HTTP errors, and logging-on-error."""
         pattern = ErrorPattern()
 
         for file_path in files:
@@ -345,19 +390,27 @@ class DNAExtractor:
             if not content:
                 continue
 
-            if "HTTPException" in content:
+            # Only count HTTPException if it's actually imported
+            if re.search(r"^from.*import.*HTTPException", content, re.MULTILINE):
                 pattern.http_exception_usage = True
             if "logger.error" in content and "except" in content:
                 pattern.logging_on_error = True
 
-            custom = re.findall(r"class\s+(\w*(?:Error|Exception)\w*)", content)
-            pattern.exception_classes.extend(custom)
+            # Custom exception classes -- must inherit from Exception/Error,
+            # exclude dataclass-style Pattern/Model classes
+            for match in re.finditer(
+                r"^class\s+(\w+(?:Error|Exception))\s*\(", content, re.MULTILINE
+            ):
+                name = match.group(1)
+                # Skip our own model dataclasses and test helpers
+                if name.endswith("Pattern") or name.startswith("Test"):
+                    continue
+                pattern.exception_classes.append(name)
 
         pattern.exception_classes = list(set(pattern.exception_classes))
         return pattern
 
     def _extract_logging_patterns(self, files: List[Path]) -> LoggingPattern:
-        """Detect logger setup, levels, and structured logging."""
         pattern = LoggingPattern()
         levels: set = set()
 
@@ -368,26 +421,22 @@ class DNAExtractor:
             if not content:
                 continue
 
-            if "logging.getLogger" in content:
+            if re.search(r"^.*logging\.getLogger", content, re.MULTILINE):
                 pattern.logger_import = "logging.getLogger(__name__)"
-            elif "import logging" in content and not pattern.logger_import:
+            elif re.search(r"^import logging\b", content, re.MULTILINE) and not pattern.logger_import:
                 pattern.logger_import = "import logging"
-            if "structlog" in content:
+            if re.search(r"^import structlog\b|^from structlog\b", content, re.MULTILINE):
                 pattern.structured_logging = True
                 pattern.logger_import = "structlog"
 
             for level in ("debug", "info", "warning", "error", "critical"):
-                if f"logger.{level}" in content or f"logging.{level}" in content:
+                if f"logger.{level}" in content:
                     levels.add(level)
-
-            if "metrics.increment" in content or "metrics.gauge" in content:
-                pattern.metrics_tracking = True
 
         pattern.log_levels_used = list(levels)
         return pattern
 
     def _extract_naming_conventions(self, files: List[Path]) -> NamingConventions:
-        """Detect dominant naming styles for functions, classes, files."""
         conventions = NamingConventions()
         func_styles: Counter = Counter()
         class_styles: Counter = Counter()
@@ -399,7 +448,7 @@ class DNAExtractor:
             if not content:
                 continue
 
-            for func in re.findall(r"def\s+(\w+)\s*\(", content):
+            for func in re.findall(r"^def\s+(\w+)\s*\(", content, re.MULTILINE):
                 if func.startswith("_"):
                     continue
                 if "_" in func:
@@ -407,7 +456,7 @@ class DNAExtractor:
                 elif func[0].islower() and any(c.isupper() for c in func):
                     func_styles["camelCase"] += 1
 
-            for cls in re.findall(r"class\s+(\w+)", content):
+            for cls in re.findall(r"^class\s+(\w+)", content, re.MULTILINE):
                 if cls[0].isupper() and "_" not in cls:
                     class_styles["PascalCase"] += 1
 
@@ -425,7 +474,11 @@ class DNAExtractor:
         return conventions
 
     def _extract_common_imports(self, files: List[Path]) -> List[str]:
-        """Find the most frequently used import statements."""
+        """Find most frequent import statements.
+
+        Only matches complete single-line imports to avoid truncating
+        multi-line imports like `from x import (a, b, c)`.
+        """
         counter: Counter = Counter()
 
         for file_path in files:
@@ -435,15 +488,19 @@ class DNAExtractor:
             if not content:
                 continue
 
-            for imp in re.findall(r"^(?:from\s+[\w.]+\s+)?import\s+.+$", content, re.MULTILINE):
+            # Only match single-line imports (no opening paren at end)
+            for imp in re.findall(
+                r"^((?:from\s+[\w.]+\s+)?import\s+[\w., ]+)$", content, re.MULTILINE
+            ):
                 imp = imp.strip()
-                if imp and not imp.startswith("#"):
-                    counter[imp] += 1
+                # Skip multi-line (has trailing paren), comments, relative imports
+                if imp.endswith("(") or imp.startswith("#") or "from ." in imp:
+                    continue
+                counter[imp] += 1
 
         return [imp for imp, count in counter.most_common(20) if count >= 2]
 
     def _extract_api_patterns(self, files: List[Path], repo_path: Path) -> tuple:
-        """Detect API versioning and router patterns."""
         api_versioning = None
         router_pattern = None
 
@@ -466,12 +523,16 @@ class DNAExtractor:
 
         return api_versioning, router_pattern
 
-    def _extract_test_patterns(self, files: List[Path], repo_path: Path) -> TestPattern:
-        """Detect test framework, fixtures, mocking, and coverage config."""
+    def _extract_test_patterns(
+        self, app_files: List[Path], test_files: List[Path], repo_path: Path
+    ) -> TestPattern:
+        """Detect test framework and conventions from test files specifically."""
         pattern = TestPattern()
         pattern.has_conftest = bool(list(repo_path.rglob("conftest.py")))
 
-        for file_path in files:
+        # Check test files for framework and convention signals
+        all_files = app_files + test_files
+        for file_path in all_files:
             content = self._safe_read_file(file_path)
             if not content:
                 continue
@@ -484,8 +545,6 @@ class DNAExtractor:
                 pattern.framework = "unittest"
                 if "def setUp(" in content:
                     pattern.fixture_style = "setUp/tearDown"
-            elif "from django.test" in content:
-                pattern.framework = "django.test"
 
             if "from unittest.mock import" in content or "@patch(" in content:
                 pattern.mock_library = "unittest.mock"
@@ -501,7 +560,6 @@ class DNAExtractor:
         return pattern
 
     def _extract_config_patterns(self, files: List[Path], repo_path: Path) -> ConfigPattern:
-        """Detect env loading, settings structure, and secrets handling."""
         pattern = ConfigPattern()
 
         for file_path in files:
@@ -509,19 +567,16 @@ class DNAExtractor:
             if not content:
                 continue
 
-            if "load_dotenv" in content or "from dotenv import" in content:
+            if re.search(r"^from dotenv import|^.*load_dotenv", content, re.MULTILINE):
                 pattern.env_loading = "python-dotenv"
-            elif "from decouple import" in content:
+            elif re.search(r"^from decouple import", content, re.MULTILINE):
                 pattern.env_loading = "python-decouple"
 
-            if "BaseSettings" in content and "pydantic" in content:
+            if "BaseSettings" in content and re.search(r"^from pydantic", content, re.MULTILINE):
                 pattern.settings_pattern = "Pydantic Settings"
                 pattern.config_validation = True
-            elif "dynaconf" in content:
-                pattern.settings_pattern = "Dynaconf"
-                pattern.config_validation = True
 
-            if "os.getenv(" in content or "os.environ" in content:
+            if re.search(r"^.*os\.getenv\(|^.*os\.environ", content, re.MULTILINE):
                 pattern.secrets_handling = "Environment variables"
 
         if (repo_path / "settings.py").exists():
@@ -538,11 +593,9 @@ class DNAExtractor:
     def extract(self, repo_path: str) -> Optional[CodebaseDNA]:
         """Extract complete DNA profile from a codebase.
 
-        Args:
-            repo_path: Path to the repository root.
-
-        Returns:
-            CodebaseDNA dataclass, or None if extraction fails.
+        Separates application code from test code. Pattern detection
+        runs only on app code to avoid false positives from test
+        fixtures and template strings.
         """
         start = time.time()
         path = Path(repo_path)
@@ -555,39 +608,43 @@ class DNAExtractor:
         repo_name = path.name
         logger.info("Extracting DNA from %s", repo_name)
 
-        files = self._discover_files(path)
-        logger.info("Found %d code files", len(files))
+        app_files, test_files = self._discover_files(path)
+        total = len(app_files) + len(test_files)
+        logger.info("Found %d code files (%d app, %d test)", total, len(app_files), len(test_files))
 
-        if not files:
+        if not app_files and not test_files:
             logger.warning("No code files found in %s", path)
             return None
 
-        framework = self._detect_framework(files)
+        # Framework detection on app code only
+        framework = self._detect_framework(app_files)
         logger.info("Detected framework: %s", framework)
 
+        # Language distribution counts ALL files
         lang_dist: Counter = Counter()
-        for f in files:
+        for f in app_files + test_files:
             lang = self._detect_language(str(f))
             if lang != "unknown":
                 lang_dist[lang] += 1
 
         team_rules, team_rules_source = self._extract_team_rules(path)
-        api_versioning, router_pattern = self._extract_api_patterns(files, path)
+        api_versioning, router_pattern = self._extract_api_patterns(app_files, path)
 
+        # Pattern extraction on APP CODE ONLY (avoids test fixture noise)
         dna = CodebaseDNA(
             repo_name=repo_name,
             detected_framework=framework,
             language_distribution=dict(lang_dist),
-            auth_patterns=self._extract_auth_patterns(files, path, framework),
-            service_patterns=self._extract_service_patterns(files, path),
-            database_patterns=self._extract_database_patterns(files, path),
-            error_patterns=self._extract_error_patterns(files),
-            logging_patterns=self._extract_logging_patterns(files),
-            naming_conventions=self._extract_naming_conventions(files),
-            test_patterns=self._extract_test_patterns(files, path),
-            config_patterns=self._extract_config_patterns(files, path),
-            middleware_patterns=self._extract_middleware_patterns(files, framework),
-            common_imports=self._extract_common_imports(files),
+            auth_patterns=self._extract_auth_patterns(app_files, path, framework),
+            service_patterns=self._extract_service_patterns(app_files, path),
+            database_patterns=self._extract_database_patterns(app_files, path),
+            error_patterns=self._extract_error_patterns(app_files),
+            logging_patterns=self._extract_logging_patterns(app_files),
+            naming_conventions=self._extract_naming_conventions(app_files),
+            test_patterns=self._extract_test_patterns(app_files, test_files, path),
+            config_patterns=self._extract_config_patterns(app_files, path),
+            middleware_patterns=self._extract_middleware_patterns(app_files, framework),
+            common_imports=self._extract_common_imports(app_files),
             skip_directories=list(self.SKIP_DIRS),
             api_versioning=api_versioning,
             router_pattern=router_pattern,
@@ -598,8 +655,6 @@ class DNAExtractor:
         elapsed = time.time() - start
         logger.info(
             "DNA extraction complete: %.2fs, %d files read, %d skipped",
-            elapsed,
-            self._stats["files_read"],
-            self._stats["files_skipped"],
+            elapsed, self._stats["files_read"], self._stats["files_skipped"],
         )
         return dna
