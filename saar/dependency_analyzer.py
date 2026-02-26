@@ -149,18 +149,19 @@ class DependencyAnalyzer:
 
     # -- graph building ---------------------------------------------------
 
-    def build_graph(self, repo_path: str) -> Dict:
+    def build_graph(self, repo_path: str, extra_skip_dirs: set = None) -> Dict:
         """Build complete dependency graph for a repository.
 
         Returns dict with nodes, edges, metrics, and circular deps.
         """
         path = Path(repo_path)
+        skip = self.SKIP_DIRS | (extra_skip_dirs or set())
         extensions = {".py", ".js", ".jsx", ".ts", ".tsx"}
 
         code_files: List[Path] = []
         for fp in path.rglob("*"):
             if fp.is_file() and fp.suffix in extensions:
-                if not any(skip in fp.parts for skip in self.SKIP_DIRS):
+                if not any(s in fp.parts for s in skip):
                     code_files.append(fp)
 
         logger.info("Building dependency graph: %d files", len(code_files))

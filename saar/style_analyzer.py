@@ -112,19 +112,20 @@ class StyleAnalyzer:
             return "->" in source_text or ": " in source_text
         return ": " in source_text and ("interface" in source_text or "type " in source_text)
 
-    def analyze(self, repo_path: str) -> Dict:
+    def analyze(self, repo_path: str, extra_skip_dirs: set = None) -> Dict:
         """Analyze coding style patterns across a repository.
 
         Returns a dict with summary stats, naming conventions,
         language distribution, top imports, and pattern metrics.
         """
         path = Path(repo_path)
+        skip = self.SKIP_DIRS | (extra_skip_dirs or set())
         extensions = {".py", ".js", ".jsx", ".ts", ".tsx"}
 
         code_files: List[Path] = []
         for fp in path.rglob("*"):
             if fp.is_file() and fp.suffix in extensions:
-                if not any(skip in fp.parts for skip in self.SKIP_DIRS):
+                if not any(s in fp.parts for s in skip):
                     code_files.append(fp)
 
         function_names: List[str] = []

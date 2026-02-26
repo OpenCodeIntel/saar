@@ -73,6 +73,7 @@ class DNAExtractor:
         }
         self._file_cache: Dict[Path, str] = {}
         self._stats = {"files_read": 0, "files_skipped": 0, "read_errors": 0}
+        self._active_skip_dirs = set(self.SKIP_DIRS)
 
     # -- file I/O ---------------------------------------------------------
 
@@ -145,7 +146,7 @@ class DNAExtractor:
                 if item.is_symlink():
                     continue
                 if item.is_file() and item.suffix in extensions:
-                    if any(skip in item.parts for skip in self.SKIP_DIRS):
+                    if any(skip in item.parts for skip in self._active_skip_dirs):
                         continue
                     total = len(app_files) + len(test_files)
                     if total >= self.MAX_FILES:
@@ -167,11 +168,50 @@ class DNAExtractor:
             ".ts": "typescript", ".tsx": "typescript",
         }.get(ext, "unknown")
 
+    def _read_gitignore_dirs(self, repo_path: Path) -> set:
+        """Parse .gitignore for directory patterns to skip.
+
+        Only extracts simple directory names (like 'repos/' or 'data/').
+        Does not handle globs or negation -- those need a full gitignore parser.
+        """
+        dirs: set = set()
+        gitignore = repo_path / ".gitignore"
+        if not gitignore.exists():
+            return dirs
+        try:
+            for line in gitignore.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                # lines ending with / are directories
+                if line.endswith("/"):
+                    dirs.add(line.rstrip("/"))
+                # bare names that exist as dirs
+                elif "/" not in line and "*" not in line and "!" not in line:
+                    candidate = repo_path / line
+                    if candidate.is_dir():
+                        dirs.add(line)
+        except Exception as e:
+            logger.debug("Error reading .gitignore: %s", e)
+        if dirs:
+            logger.info("Gitignore dirs to skip: %s", dirs)
+        return dirs
+
     # -- team rules -------------------------------------------------------
 
-    def _extract_team_rules(self, repo_path: Path) -> Tuple[Optional[str], Optional[str]]:
-        """Find and read team convention files (CLAUDE.md, .cursorrules, etc.)."""
+    def _extract_team_rules(
+        self, repo_path: Path, exclude_files: Optional[list] = None,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Find and read team convention files (CLAUDE.md, .cursorrules, etc.).
+
+        Args:
+            exclude_files: Filenames to skip (prevents inception loop).
+        """
+        skip = set(exclude_files or [])
         for filename in self.RULES_FILES:
+            if filename in skip:
+                logger.debug("Skipping %s (exclude list)", filename)
+                continue
             rules_path = repo_path / filename
             if rules_path.exists() and rules_path.is_file():
                 content = self._safe_read_file(rules_path)
@@ -590,12 +630,19 @@ class DNAExtractor:
 
     # -- main entry point -------------------------------------------------
 
-    def extract(self, repo_path: str) -> Optional[CodebaseDNA]:
+    def extract(
+        self,
+        repo_path: str,
+        exclude_dirs: Optional[list] = None,
+        exclude_rules_files: Optional[list] = None,
+    ) -> Optional[CodebaseDNA]:
         """Extract complete DNA profile from a codebase.
 
-        Separates application code from test code. Pattern detection
-        runs only on app code to avoid false positives from test
-        fixtures and template strings.
+        Args:
+            repo_path: Path to the repository root.
+            exclude_dirs: Extra directories to skip during file discovery.
+            exclude_rules_files: Config filenames to skip when reading team
+                rules (prevents inception when generating CLAUDE.md etc.).
         """
         start = time.time()
         path = Path(repo_path)
@@ -603,6 +650,13 @@ class DNAExtractor:
         if not path.exists() or not path.is_dir():
             logger.error("Invalid repo path: %s", path)
             return None
+
+        # merge user excludes with defaults + .gitignore dirs
+        skip = set(self.SKIP_DIRS)
+        if exclude_dirs:
+            skip.update(exclude_dirs)
+        skip.update(self._read_gitignore_dirs(path))
+        self._active_skip_dirs = skip
 
         self._reset_cache()
         repo_name = path.name
@@ -627,7 +681,7 @@ class DNAExtractor:
             if lang != "unknown":
                 lang_dist[lang] += 1
 
-        team_rules, team_rules_source = self._extract_team_rules(path)
+        team_rules, team_rules_source = self._extract_team_rules(path, exclude_rules_files)
         api_versioning, router_pattern = self._extract_api_patterns(app_files, path)
 
         # Pattern extraction on APP CODE ONLY (avoids test fixture noise)
@@ -645,7 +699,7 @@ class DNAExtractor:
             config_patterns=self._extract_config_patterns(app_files, path),
             middleware_patterns=self._extract_middleware_patterns(app_files, framework),
             common_imports=self._extract_common_imports(app_files),
-            skip_directories=list(self.SKIP_DIRS),
+            skip_directories=list(self._active_skip_dirs),
             api_versioning=api_versioning,
             router_pattern=router_pattern,
             team_rules=team_rules,
@@ -669,7 +723,8 @@ class DNAExtractor:
         """Run style analyzer and merge results into DNA."""
         try:
             from saar.style_analyzer import StyleAnalyzer
-            style = StyleAnalyzer().analyze(repo_path)
+            extra = self._active_skip_dirs - self.SKIP_DIRS
+            style = StyleAnalyzer().analyze(repo_path, extra_skip_dirs=extra or None)
             summary = style.get("summary", {})
             dna.async_adoption_pct = summary.get("async_pct", 0.0)
             dna.type_hint_pct = summary.get("typed_pct", 0.0)
@@ -687,7 +742,8 @@ class DNAExtractor:
         """Run dependency analyzer and merge results into DNA."""
         try:
             from saar.dependency_analyzer import DependencyAnalyzer
-            graph = DependencyAnalyzer().build_graph(repo_path)
+            extra = self._active_skip_dirs - self.SKIP_DIRS
+            graph = DependencyAnalyzer().build_graph(repo_path, extra_skip_dirs=extra or None)
             dna.total_dependencies = graph.get("total_dependencies", 0)
             dna.circular_dependencies = graph.get("circular_dependencies", [])
             metrics = graph.get("metrics", {})

@@ -6,11 +6,12 @@ Usage:
     saar ./my-repo --format all         # generate all config files
     saar ./my-repo -o ./output/         # write to directory
     saar ./my-repo --format claude --force  # overwrite existing files
+    saar ./my-repo --exclude data vendor    # skip directories
 """
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -33,6 +34,14 @@ class OutputFormat(str, Enum):
     cursorrules = "cursorrules"
     copilot = "copilot"
     all = "all"
+
+
+# Maps output format -> the config file it writes (for inception prevention)
+_FORMAT_FILENAMES = {
+    OutputFormat.claude: "CLAUDE.md",
+    OutputFormat.cursorrules: ".cursorrules",
+    OutputFormat.copilot: ".github/copilot-instructions.md",
+}
 
 
 def version_callback(value: bool) -> None:
@@ -61,6 +70,11 @@ def extract(
         "--output", "-o",
         help="Output directory. Defaults to stdout for markdown, repo root for config files.",
     ),
+    exclude: Optional[List[str]] = typer.Option(
+        None,
+        "--exclude", "-e",
+        help="Directories to skip (e.g. --exclude data vendor repos).",
+    ),
     force: bool = typer.Option(
         False,
         "--force",
@@ -85,11 +99,26 @@ def extract(
 
     console.print(f"[bold]saar[/bold] analyzing [cyan]{repo_path.name}[/cyan]...")
 
-    # -- import here to keep CLI startup fast --
+    # Determine which config files we're writing so we don't read
+    # them as "team rules" input (prevents inception loop)
+    if format == OutputFormat.all:
+        target_formats = [OutputFormat.claude, OutputFormat.cursorrules, OutputFormat.copilot]
+    else:
+        target_formats = [format]
+
+    exclude_rules = [
+        _FORMAT_FILENAMES[f] for f in target_formats if f in _FORMAT_FILENAMES
+    ]
+
+    # -- extract --
     from saar.extractor import DNAExtractor
 
     extractor = DNAExtractor()
-    dna = extractor.extract(str(repo_path))
+    dna = extractor.extract(
+        str(repo_path),
+        exclude_dirs=exclude or None,
+        exclude_rules_files=exclude_rules or None,
+    )
 
     if dna is None:
         console.print("[red]Extraction failed. Use --verbose for details.[/red]")
@@ -98,12 +127,7 @@ def extract(
     # -- format and output --
     from saar.formatters import render
 
-    if format == OutputFormat.all:
-        formats = [OutputFormat.claude, OutputFormat.cursorrules, OutputFormat.copilot]
-    else:
-        formats = [format]
-
-    for fmt in formats:
+    for fmt in target_formats:
         text = render(dna, fmt.value)
         target = _resolve_output_path(fmt, output, repo_path)
 
@@ -123,13 +147,7 @@ def _resolve_output_path(
     fmt: OutputFormat, output_dir: Optional[Path], repo_path: Path
 ) -> Optional[Path]:
     """Determine where to write the output file, or None for stdout."""
-    filenames = {
-        OutputFormat.claude: "CLAUDE.md",
-        OutputFormat.cursorrules: ".cursorrules",
-        OutputFormat.copilot: ".github/copilot-instructions.md",
-        OutputFormat.markdown: None,
-    }
-    filename = filenames.get(fmt)
+    filename = _FORMAT_FILENAMES.get(fmt)
 
     if filename is None:
         if output_dir:
