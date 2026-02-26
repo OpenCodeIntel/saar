@@ -14,6 +14,15 @@ def render_claude_md(dna: CodebaseDNA) -> str:
     if dna.detected_framework:
         lines.append(f"This is a {dna.detected_framework} project.\n")
 
+    # -- codebase stats --
+    if dna.total_functions or dna.total_classes:
+        lines.append(f"{dna.total_functions:,} functions, {dna.total_classes:,} classes.")
+        if dna.async_adoption_pct > 0:
+            lines.append(f"Async adoption: {dna.async_adoption_pct:.0f}%.")
+        if dna.type_hint_pct > 0:
+            lines.append(f"Type hint coverage: {dna.type_hint_pct:.0f}%.")
+        lines.append("")
+
     # -- coding conventions as imperative rules --
     lines.append("## Coding Conventions\n")
     nc = dna.naming_conventions
@@ -92,6 +101,12 @@ def render_claude_md(dna: CodebaseDNA) -> str:
             lines.append(f"- API versioning: `{dna.api_versioning}`")
         if dna.router_pattern:
             lines.append(f"- Router pattern: `{dna.router_pattern}`")
+
+    # -- dependency warnings --
+    if dna.circular_dependencies:
+        lines.append("\n## Circular Dependencies (fix these)\n")
+        for pair in dna.circular_dependencies[:5]:
+            lines.append(f"- `{pair[0]}` <-> `{pair[1]}`")
 
     # -- team rules (verbatim if they exist) --
     if dna.team_rules:

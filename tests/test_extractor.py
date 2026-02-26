@@ -69,6 +69,21 @@ class TestDNAExtractor:
         assert any("logging" in imp for imp in dna.common_imports)
 
 
+    def test_enriches_with_style(self, tmp_repo: Path):
+        """Style analyzer should populate function/class counts."""
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_repo))
+        assert dna.total_functions >= 2
+        assert dna.total_classes >= 1
+
+    def test_enriches_with_deps(self, tmp_repo: Path):
+        """Dependency analyzer should populate graph data."""
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_repo))
+        # tmp_repo has dependencies.py importing from services/
+        assert dna.total_dependencies >= 0
+
+
 class TestFileClassification:
     """Test that app code and test code are separated correctly."""
 

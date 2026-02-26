@@ -69,6 +69,23 @@ class TestMarkdownFormatter:
         assert "No emojis" in out
         assert "CLAUDE.md" in out
 
+    def test_includes_codebase_stats(self, sample_dna: CodebaseDNA):
+        out = render_markdown(sample_dna)
+        assert "200" in out  # total_functions
+        assert "45%" in out  # async adoption
+        assert "80%" in out  # type hints
+
+    def test_includes_critical_files(self, sample_dna: CodebaseDNA):
+        out = render_markdown(sample_dna)
+        assert "services/auth.py" in out
+        assert "12 dependents" in out
+
+    def test_includes_circular_deps(self, sample_dna: CodebaseDNA):
+        out = render_markdown(sample_dna)
+        assert "Circular" in out
+        assert "services/auth.py" in out
+        assert "services/user.py" in out
+
     def test_empty_dna_no_crash(self, empty_dna: CodebaseDNA):
         out = render_markdown(empty_dna)
         assert "empty-project" in out
@@ -94,6 +111,15 @@ class TestClaudeMdFormatter:
     def test_includes_testing(self, sample_dna: CodebaseDNA):
         out = render_claude_md(sample_dna)
         assert "pytest" in out
+
+    def test_includes_stats(self, sample_dna: CodebaseDNA):
+        out = render_claude_md(sample_dna)
+        assert "200" in out  # functions
+        assert "45%" in out  # async
+
+    def test_includes_circular_warning(self, sample_dna: CodebaseDNA):
+        out = render_claude_md(sample_dna)
+        assert "Circular" in out
 
     def test_empty_dna_no_crash(self, empty_dna: CodebaseDNA):
         out = render_claude_md(empty_dna)

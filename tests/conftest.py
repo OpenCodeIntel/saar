@@ -68,6 +68,13 @@ def sample_dna() -> CodebaseDNA:
         router_pattern='APIRouter(prefix="/repos", tags=[...])',
         team_rules="- No emojis\n- Type hints on all functions",
         team_rules_source="CLAUDE.md",
+        async_adoption_pct=45.0,
+        type_hint_pct=80.0,
+        total_functions=200,
+        total_classes=25,
+        total_dependencies=85,
+        circular_dependencies=[["services/auth.py", "services/user.py"]],
+        critical_files=[{"file": "services/auth.py", "dependents": 12}],
     )
 
 

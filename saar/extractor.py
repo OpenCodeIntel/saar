@@ -652,9 +652,51 @@ class DNAExtractor:
             team_rules_source=team_rules_source,
         )
 
+        # Enrich with style analysis (AST-based, more precise than regex)
+        self._enrich_with_style(dna, str(path))
+
+        # Enrich with dependency graph data
+        self._enrich_with_deps(dna, str(path))
+
         elapsed = time.time() - start
         logger.info(
             "DNA extraction complete: %.2fs, %d files read, %d skipped",
             elapsed, self._stats["files_read"], self._stats["files_skipped"],
         )
         return dna
+
+    def _enrich_with_style(self, dna: CodebaseDNA, repo_path: str) -> None:
+        """Run style analyzer and merge results into DNA."""
+        try:
+            from saar.style_analyzer import StyleAnalyzer
+            style = StyleAnalyzer().analyze(repo_path)
+            summary = style.get("summary", {})
+            dna.async_adoption_pct = summary.get("async_pct", 0.0)
+            dna.type_hint_pct = summary.get("typed_pct", 0.0)
+            dna.total_functions = summary.get("total_functions", 0)
+            dna.total_classes = summary.get("total_classes", 0)
+            logger.info(
+                "Style: %d functions, %d classes, %.0f%% async, %.0f%% typed",
+                dna.total_functions, dna.total_classes,
+                dna.async_adoption_pct, dna.type_hint_pct,
+            )
+        except Exception as e:
+            logger.warning("Style analysis failed: %s", e)
+
+    def _enrich_with_deps(self, dna: CodebaseDNA, repo_path: str) -> None:
+        """Run dependency analyzer and merge results into DNA."""
+        try:
+            from saar.dependency_analyzer import DependencyAnalyzer
+            graph = DependencyAnalyzer().build_graph(repo_path)
+            dna.total_dependencies = graph.get("total_dependencies", 0)
+            dna.circular_dependencies = graph.get("circular_dependencies", [])
+            metrics = graph.get("metrics", {})
+            dna.critical_files = metrics.get("most_critical_files", [])
+            logger.info(
+                "Deps: %d edges, %d cycles, %d critical files",
+                dna.total_dependencies,
+                len(dna.circular_dependencies),
+                len(dna.critical_files),
+            )
+        except Exception as e:
+            logger.warning("Dependency analysis failed: %s", e)

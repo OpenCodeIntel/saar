@@ -14,6 +14,7 @@ def render_markdown(dna: CodebaseDNA) -> str:
         md += f"**Framework:** {dna.detected_framework}\n\n"
 
     md += _section_languages(dna)
+    md += _section_codebase_stats(dna)
     md += _section_auth(dna)
     md += _section_services(dna)
     md += _section_database(dna)
@@ -24,6 +25,7 @@ def render_markdown(dna: CodebaseDNA) -> str:
     md += _section_api(dna)
     md += _section_tests(dna)
     md += _section_config(dna)
+    md += _section_dependency_insights(dna)
     md += _section_team_rules(dna)
 
     return md
@@ -36,6 +38,35 @@ def _section_languages(dna: CodebaseDNA) -> str:
     for lang, count in sorted(dna.language_distribution.items(), key=lambda x: -x[1]):
         out += f"- {lang}: {count} files\n"
     return out + "\n"
+
+
+def _section_codebase_stats(dna: CodebaseDNA) -> str:
+    if not (dna.total_functions or dna.total_classes):
+        return ""
+    out = "## Codebase Stats\n"
+    out += f"**Functions:** {dna.total_functions:,} | **Classes:** {dna.total_classes:,}\n"
+    if dna.async_adoption_pct > 0:
+        out += f"**Async Adoption:** {dna.async_adoption_pct:.0f}%\n"
+    if dna.type_hint_pct > 0:
+        out += f"**Type Hint Coverage:** {dna.type_hint_pct:.0f}%\n"
+    if dna.total_dependencies > 0:
+        out += f"**Internal Dependencies:** {dna.total_dependencies:,}\n"
+    return out + "\n"
+
+
+def _section_dependency_insights(dna: CodebaseDNA) -> str:
+    parts: list = []
+    if dna.critical_files:
+        parts.append("## Critical Files (highest dependents)\n")
+        for item in dna.critical_files[:5]:
+            parts.append(f"- `{item.get('file', '?')}` ({item.get('dependents', 0)} dependents)\n")
+        parts.append("\n")
+    if dna.circular_dependencies:
+        parts.append(f"## Circular Dependencies ({len(dna.circular_dependencies)})\n")
+        for pair in dna.circular_dependencies[:10]:
+            parts.append(f"- `{pair[0]}` <-> `{pair[1]}`\n")
+        parts.append("\n")
+    return "".join(parts)
 
 
 def _section_auth(dna: CodebaseDNA) -> str:

@@ -105,6 +105,15 @@ class CodebaseDNA:
     router_pattern: Optional[str] = None
     team_rules: Optional[str] = None
     team_rules_source: Optional[str] = None
+    # style analysis enrichments
+    async_adoption_pct: float = 0.0
+    type_hint_pct: float = 0.0
+    total_functions: int = 0
+    total_classes: int = 0
+    # dependency graph enrichments
+    circular_dependencies: List = field(default_factory=list)
+    critical_files: List = field(default_factory=list)
+    total_dependencies: int = 0
 
     def to_dict(self) -> Dict:
         return asdict(self)
