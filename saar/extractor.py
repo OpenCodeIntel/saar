@@ -399,11 +399,8 @@ class DNAExtractor:
             if file_path.suffix != ".py":
                 continue
 
-            # ORM detection -- require actual imports, not string mentions
-            if re.search(r"^from supabase\b|^import supabase\b|\.from_\(\s*['\"]supabase", content, re.MULTILINE):
-                pattern.orm_used = "Supabase"
-            # Supabase client usage is a strong signal even without direct import
-            if "supabase.client.table(" in content or "get_supabase_service()" in content:
+            # ORM detection -- line-start anchored to avoid matching string literals
+            if re.search(r"^from supabase\b|^import supabase\b", content, re.MULTILINE):
                 pattern.orm_used = "Supabase"
             if re.search(r"^from django\.db import models", content, re.MULTILINE):
                 pattern.orm_used = "Django ORM"
@@ -607,7 +604,7 @@ class DNAExtractor:
             if not content:
                 continue
 
-            if re.search(r"^from dotenv import|^.*load_dotenv", content, re.MULTILINE):
+            if re.search(r"^from dotenv import|^load_dotenv\b", content, re.MULTILINE):
                 pattern.env_loading = "python-dotenv"
             elif re.search(r"^from decouple import", content, re.MULTILINE):
                 pattern.env_loading = "python-decouple"
