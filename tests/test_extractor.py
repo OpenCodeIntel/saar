@@ -195,3 +195,60 @@ class TestExtractorEdgeCases:
         extractor = DNAExtractor()
         dna = extractor.extract(str(tmp_path))
         assert dna is not None
+
+    def test_skips_repos_dir(self, tmp_path: Path):
+        """repos/ should be skipped -- it contains user-cloned repos, not project code."""
+        repos_dir = tmp_path / "repos" / "some-user-repo"
+        repos_dir.mkdir(parents=True)
+        # put a python file inside repos/ -- should NOT be counted
+        (repos_dir / "main.py").write_text("def user_code(): pass\n" * 50)
+        # real project code
+        (tmp_path / "app.py").write_text("def real_function(): pass\n")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna is not None
+        # only app.py should be counted, not repos/
+        assert dna.language_distribution.get("python", 0) == 1
+
+    def test_skips_dist_and_build(self, tmp_path: Path):
+        """dist/ and build/ are generated artifacts, not source code."""
+        for junk_dir in ["dist", "build", "out"]:
+            d = tmp_path / junk_dir
+            d.mkdir()
+            (d / "bundle.py").write_text("# compiled output\n" * 100)
+        (tmp_path / "src.py").write_text("def real(): pass\n")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna is not None
+        assert dna.language_distribution.get("python", 0) == 1
+
+    def test_respects_saarignore(self, tmp_path: Path):
+        """.saarignore uses same syntax as .gitignore and is merged into skip dirs."""
+        custom_dir = tmp_path / "vendor"
+        custom_dir.mkdir()
+        (custom_dir / "lib.py").write_text("def vendor_code(): pass\n" * 20)
+        (tmp_path / "app.py").write_text("def real(): pass\n")
+        # tell saar to skip vendor/ via .saarignore
+        (tmp_path / ".saarignore").write_text("vendor/\n")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna is not None
+        assert dna.language_distribution.get("python", 0) == 1
+
+    def test_saarignore_stacks_with_gitignore(self, tmp_path: Path):
+        """Both .gitignore and .saarignore dirs are skipped -- they merge, not replace."""
+        (tmp_path / "gitignored").mkdir()
+        (tmp_path / "gitignored" / "a.py").write_text("x = 1\n" * 10)
+        (tmp_path / "saarignored").mkdir()
+        (tmp_path / "saarignored" / "b.py").write_text("y = 2\n" * 10)
+        (tmp_path / "real.py").write_text("def real(): pass\n")
+        (tmp_path / ".gitignore").write_text("gitignored/\n")
+        (tmp_path / ".saarignore").write_text("saarignored/\n")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna is not None
+        assert dna.language_distribution.get("python", 0) == 1
