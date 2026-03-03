@@ -7,11 +7,34 @@ import logging
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Set
 
 import tree_sitter_python as tspython
 import tree_sitter_javascript as tsjavascript
 from tree_sitter import Language, Parser
+
+
+def _path_should_skip(file_path: Path, repo_path: Path, skip: Set[str]) -> bool:
+    """Check whether a file falls under a skip directory.
+
+    Handles both simple names ('node_modules') and multi-component
+    paths ('backend/repos') from gitignore patterns.
+    """
+    parts = file_path.parts
+    try:
+        rel_parts = file_path.relative_to(repo_path).parts
+    except ValueError:
+        rel_parts = parts
+
+    for s in skip:
+        if "/" in s or "\\" in s:
+            skip_parts = tuple(s.replace("\\", "/").split("/"))
+            if rel_parts[:len(skip_parts)] == skip_parts:
+                return True
+        else:
+            if s in parts:
+                return True
+    return False
 
 logger = logging.getLogger(__name__)
 
@@ -55,20 +78,61 @@ class StyleAnalyzer:
         return "mixed"
 
     def _extract_identifiers(self, node, source: bytes, id_type: str) -> List[str]:
-        """Walk AST to extract function or class names."""
+        """Walk AST to extract function or class names.
+
+        For Python: function_definition, class_definition.
+        For JS/TS: function_declaration, method_definition, arrow_function
+        (via variable_declarator parent), class_declaration.
+        Arrow functions need special handling -- the name lives in the parent
+        variable_declarator node, not the arrow_function node itself.
+        """
         names: List[str] = []
 
-        if id_type == "function" and node.type in ("function_definition", "function_declaration"):
-            for child in node.children:
-                if child.type == "identifier":
-                    names.append(source[child.start_byte:child.end_byte].decode("utf-8"))
-                    break
+        if id_type == "function":
+            # Python named function
+            if node.type == "function_definition":
+                for child in node.children:
+                    if child.type == "identifier":
+                        names.append(source[child.start_byte:child.end_byte].decode("utf-8"))
+                        break
 
-        elif id_type == "class" and node.type == "class_definition":
-            for child in node.children:
-                if child.type == "identifier":
-                    names.append(source[child.start_byte:child.end_byte].decode("utf-8"))
-                    break
+            # JS/TS: function declaration -- function foo() {}
+            elif node.type == "function_declaration":
+                for child in node.children:
+                    if child.type == "identifier":
+                        names.append(source[child.start_byte:child.end_byte].decode("utf-8"))
+                        break
+
+            # JS/TS: class method -- method() {} or async method() {}
+            elif node.type == "method_definition":
+                for child in node.children:
+                    if child.type in ("property_identifier", "identifier"):
+                        names.append(source[child.start_byte:child.end_byte].decode("utf-8"))
+                        break
+
+            # JS/TS: const fn = () => {} -- name is in the variable_declarator
+            # We emit the name here and skip recursing into the arrow_function child
+            elif node.type == "variable_declarator":
+                has_arrow = any(c.type == "arrow_function" for c in node.children)
+                if has_arrow:
+                    for child in node.children:
+                        if child.type == "identifier":
+                            names.append(source[child.start_byte:child.end_byte].decode("utf-8"))
+                            break
+
+        elif id_type == "class":
+            # Python
+            if node.type == "class_definition":
+                for child in node.children:
+                    if child.type == "identifier":
+                        names.append(source[child.start_byte:child.end_byte].decode("utf-8"))
+                        break
+            # JS/TS
+            elif node.type in ("class_declaration", "class"):
+                for child in node.children:
+                    if child.type == "type_identifier":
+                        names.append(source[child.start_byte:child.end_byte].decode("utf-8"))
+                        break
 
         for child in node.children:
             names.extend(self._extract_identifiers(child, source, id_type))
@@ -125,7 +189,7 @@ class StyleAnalyzer:
         code_files: List[Path] = []
         for fp in path.rglob("*"):
             if fp.is_file() and fp.suffix in extensions:
-                if not any(s in fp.parts for s in skip):
+                if not _path_should_skip(fp, path, skip):
                     code_files.append(fp)
 
         function_names: List[str] = []

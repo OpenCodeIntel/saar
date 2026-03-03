@@ -8,6 +8,29 @@ import logging
 import re
 from collections import deque
 from pathlib import Path
+from typing import Set
+
+
+def _path_should_skip(file_path: Path, repo_path: Path, skip: Set[str]) -> bool:
+    """Check whether a file falls under a skip directory.
+
+    Handles both simple names and multi-component paths like 'backend/repos'.
+    """
+    parts = file_path.parts
+    try:
+        rel_parts = file_path.relative_to(repo_path).parts
+    except ValueError:
+        rel_parts = parts
+
+    for s in skip:
+        if "/" in s or "\\" in s:
+            skip_parts = tuple(s.replace("\\", "/").split("/"))
+            if rel_parts[:len(skip_parts)] == skip_parts:
+                return True
+        else:
+            if s in parts:
+                return True
+    return False
 from typing import Dict, List, Optional, Set
 
 import tree_sitter_python as tspython
@@ -161,7 +184,7 @@ class DependencyAnalyzer:
         code_files: List[Path] = []
         for fp in path.rglob("*"):
             if fp.is_file() and fp.suffix in extensions:
-                if not any(s in fp.parts for s in skip):
+                if not _path_should_skip(fp, path, skip):
                     code_files.append(fp)
 
         logger.info("Building dependency graph: %d files", len(code_files))

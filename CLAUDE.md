@@ -1,8 +1,8 @@
 <!-- SAAR:AUTO-START -->
 # CLAUDE.md -- saar
 
-245 functions, 38 classes.
-Async adoption: 17%.
+252 functions, 38 classes.
+Async adoption: 21%.
 Type hint coverage: 92%.
 
 ## Coding Conventions
@@ -10,6 +10,7 @@ Type hint coverage: 92%.
 - Use `snake_case` for function names
 - Use `PascalCase` for class names
 - Use `UPPER_SNAKE_CASE` for constants
+- Use `snake_case` for file names
 
 Preferred imports:
 ```
@@ -35,10 +36,10 @@ These files have the most dependents -- understand them before editing:
 
 - `saar/models.py` (14 dependents)
 - `saar/formatters/_tribal.py` (4 dependents)
-- `saar/cli.py` (3 dependents)
 - `saar/interview.py` (3 dependents)
-- `saar/formatters/claude_md.py` (3 dependents)
 - `saar/formatters/agents_md.py` (3 dependents)
+- `saar/cli.py` (3 dependents)
+- `saar/formatters/claude_md.py` (3 dependents)
 - `saar/dependency_analyzer.py` (2 dependents)
 - `saar/style_analyzer.py` (2 dependents)
 

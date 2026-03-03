@@ -238,6 +238,79 @@ class TestExtractorEdgeCases:
         assert dna is not None
         assert dna.language_distribution.get("python", 0) == 1
 
+    def test_skips_multi_component_path_from_gitignore(self, tmp_path: Path):
+        """backend/repos/ style paths (multi-component) must be excluded.
+
+        This was the OCI bug: 29,612 functions from backend/repos/uuid/*.
+        Single-component matching missed it. Multi-component prefix matching fixes it.
+        """
+        nested = tmp_path / "backend" / "repos" / "some-uuid-repo"
+        nested.mkdir(parents=True)
+        (nested / "huge_file.py").write_text("def user_func(): pass\n" * 500)
+        (tmp_path / "app.py").write_text("def real_app_func(): pass\n")
+        (tmp_path / ".gitignore").write_text("backend/repos/\n")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna is not None
+        assert dna.language_distribution.get("python", 0) == 1
+
+    def test_js_arrow_functions_counted(self, tmp_path: Path):
+        """Arrow functions (dominant JS/TS pattern) must be counted.
+
+        Previous bug: only function_declaration was counted, missing 90%+ of modern JS.
+        """
+        (tmp_path / "app.js").write_text("""
+const greet = (name) => `Hello ${name}`;
+const fetchUser = async (id) => {
+    const res = await fetch(`/api/users/${id}`);
+    return res.json();
+};
+export const formatDate = (date) => date.toISOString();
+class UserService {
+    getUser(id) { return this.db.find(id); }
+    async createUser(data) { return this.db.create(data); }
+}
+function legacyInit() { return true; }
+""")
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna is not None
+        assert dna.total_functions >= 5
+
+    def test_ts_naming_conventions_detected(self, tmp_path: Path):
+        """TypeScript repos should get camelCase naming conventions detected."""
+        (tmp_path / "userService.ts").write_text("""
+export const getUserById = async (id: string) => {
+    return await db.find(id);
+};
+export const createNewUser = (data: UserData) => {
+    return db.create(data);
+};
+export class UserRepository {
+    findById(id: string) { return this.db.find(id); }
+}
+""")
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna is not None
+        assert dna.naming_conventions.function_style == "camelCase"
+
+    def test_fullstack_repo_counts_both_languages(self, tmp_path: Path):
+        """Full-stack repos should count functions from Python AND JS/TS."""
+        (tmp_path / "backend.py").write_text(
+            "def get_user(): pass\ndef create_user(): pass\n"
+        )
+        (tmp_path / "frontend.ts").write_text(
+            "const getUser = () => {};\nconst createUser = () => {};\n"
+        )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna is not None
+        assert "python" in dna.language_distribution
+        assert "typescript" in dna.language_distribution
+        assert dna.total_functions >= 4
+
     def test_saarignore_stacks_with_gitignore(self, tmp_path: Path):
         """Both .gitignore and .saarignore dirs are skipped -- they merge, not replace."""
         (tmp_path / "gitignored").mkdir()

@@ -142,6 +142,33 @@ class DNAExtractor:
             return True
         return False
 
+    def _should_skip(self, file_path: Path, repo_path: Path) -> bool:
+        """Check whether a file should be excluded from analysis.
+
+        Handles both simple dir names ('node_modules') and multi-component
+        paths ('backend/repos') from gitignore. Simple names are matched
+        against individual path parts; multi-component paths are matched
+        as a relative prefix of the file's path from the repo root.
+        """
+        parts = file_path.parts
+        try:
+            rel = file_path.relative_to(repo_path)
+            rel_parts = rel.parts
+        except ValueError:
+            rel_parts = parts
+
+        for skip in self._active_skip_dirs:
+            if "/" in skip or "\\" in skip:
+                # multi-component path -- check as prefix of relative path
+                skip_parts = tuple(skip.replace("\\", "/").split("/"))
+                if rel_parts[:len(skip_parts)] == skip_parts:
+                    return True
+            else:
+                # single component -- check against all parts of absolute path
+                if skip in parts:
+                    return True
+        return False
+
     def _discover_files(self, repo_path: Path) -> Tuple[List[Path], List[Path]]:
         """Find code files, split into app files and test files.
 
@@ -159,7 +186,7 @@ class DNAExtractor:
                 if item.is_symlink():
                     continue
                 if item.is_file() and item.suffix in extensions:
-                    if any(skip in item.parts for skip in self._active_skip_dirs):
+                    if self._should_skip(item, repo_path):
                         continue
                     total = len(app_files) + len(test_files)
                     if total >= self.MAX_FILES:
@@ -492,35 +519,66 @@ class DNAExtractor:
         conventions = NamingConventions()
         func_styles: Counter = Counter()
         class_styles: Counter = Counter()
+        file_styles: Counter = Counter()
 
         for file_path in files:
-            if file_path.suffix != ".py":
-                continue
             content = self._safe_read_file(file_path)
             if not content:
                 continue
 
-            for func in re.findall(r"^def\s+(\w+)\s*\(", content, re.MULTILINE):
-                if func.startswith("_"):
-                    continue
-                if "_" in func:
-                    func_styles["snake_case"] += 1
-                elif func[0].islower() and any(c.isupper() for c in func):
-                    func_styles["camelCase"] += 1
+            if file_path.suffix == ".py":
+                # Python: look for def statements
+                for func in re.findall(r"^def\s+(\w+)\s*\(", content, re.MULTILINE):
+                    if func.startswith("_"):
+                        continue
+                    if "_" in func:
+                        func_styles["snake_case"] += 1
+                    elif func[0].islower() and any(c.isupper() for c in func):
+                        func_styles["camelCase"] += 1
 
-            for cls in re.findall(r"^class\s+(\w+)", content, re.MULTILINE):
-                if cls[0].isupper() and "_" not in cls:
-                    class_styles["PascalCase"] += 1
+                for cls in re.findall(r"^class\s+(\w+)", content, re.MULTILINE):
+                    if cls[0].isupper() and "_" not in cls:
+                        class_styles["PascalCase"] += 1
 
-        py_files = [f for f in files if f.suffix == ".py"]
-        snake_files = sum(1 for f in py_files if "_" in f.stem and f.stem.islower())
-        if py_files and snake_files > len(py_files) * 0.5:
-            conventions.file_style = "snake_case"
+                # Python file naming
+                if "_" in file_path.stem and file_path.stem.islower():
+                    file_styles["snake_case"] += 1
+
+            elif file_path.suffix in (".js", ".jsx", ".ts", ".tsx"):
+                # JS/TS: look for function declarations and const arrow functions
+                for func in re.findall(
+                    r"(?:^|\s)(?:function|const|let|var)\s+(\w+)\s*(?:=\s*(?:async\s*)?\(|[\(<])",
+                    content, re.MULTILINE
+                ):
+                    if not func or func[0].isupper():
+                        continue  # skip component names (PascalCase = component)
+                    if func[0].islower() and any(c.isupper() for c in func):
+                        func_styles["camelCase"] += 1
+                    elif "_" in func:
+                        func_styles["snake_case"] += 1
+
+                # TS/React: look for class and interface declarations
+                for cls in re.findall(
+                    r"(?:^|\s)(?:class|interface|type)\s+(\w+)", content, re.MULTILINE
+                ):
+                    if cls[0].isupper() and "_" not in cls:
+                        class_styles["PascalCase"] += 1
+
+                # JS/TS file naming: kebab-case vs camelCase
+                stem = file_path.stem.replace(".test", "").replace(".spec", "")
+                if "-" in stem:
+                    file_styles["kebab-case"] += 1
+                elif stem[0].isupper():
+                    file_styles["PascalCase"] += 1
+                elif any(c.isupper() for c in stem):
+                    file_styles["camelCase"] += 1
 
         if func_styles:
             conventions.function_style = func_styles.most_common(1)[0][0]
         if class_styles:
             conventions.class_style = class_styles.most_common(1)[0][0]
+        if file_styles:
+            conventions.file_style = file_styles.most_common(1)[0][0]
         conventions.constant_style = "UPPER_SNAKE_CASE"
 
         return conventions
