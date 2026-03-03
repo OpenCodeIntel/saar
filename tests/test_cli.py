@@ -82,17 +82,62 @@ class TestCLI:
         result = runner.invoke(app, [str(tmp_repo), "--verbose"])
         assert result.exit_code == 0
 
-    def test_skips_existing_without_force(self, tmp_repo: Path):
-        """Should not overwrite existing CLAUDE.md without --force."""
-        existing = tmp_repo / "CLAUDE.md"
-        original = existing.read_text()
-        result = runner.invoke(app, [str(tmp_repo), "--format", "claude"])
+    def test_skips_existing_without_force(self, tmp_repo: Path, tmp_path: Path):
+        """File with markers: re-run updates auto block, does not skip entirely."""
+        output_dir = tmp_path / "out"
+        output_dir.mkdir()
+        # first run creates the file
+        runner.invoke(app, [str(tmp_repo), "--format", "claude", "-o", str(output_dir)])
+        first = (output_dir / "CLAUDE.md").read_text()
+        # second run without --force should update (not skip) because markers exist
+        result = runner.invoke(app, [str(tmp_repo), "--format", "claude", "-o", str(output_dir)])
         assert result.exit_code == 0
-        assert "skipped" in result.stdout
-        assert existing.read_text() == original
+        assert "updated" in result.stdout or "wrote" in result.stdout
 
-    def test_force_overwrites(self, tmp_repo: Path):
-        """--force should overwrite existing files."""
-        result = runner.invoke(app, [str(tmp_repo), "--format", "claude", "--force"])
+    def test_force_overwrites(self, tmp_repo: Path, tmp_path: Path):
+        """--force does a clean overwrite discarding any manual edits."""
+        output_dir = tmp_path / "out"
+        output_dir.mkdir()
+        runner.invoke(app, [str(tmp_repo), "--format", "claude", "-o", str(output_dir)])
+        result = runner.invoke(
+            app, [str(tmp_repo), "--format", "claude", "--force", "-o", str(output_dir)]
+        )
         assert result.exit_code == 0
-        assert "wrote" in result.stdout
+        assert "overwrote" in result.stdout or "wrote" in result.stdout
+
+
+class TestPreservationMarkers:
+    """SAAR:AUTO-START/END markers preserve manual edits on re-run."""
+
+    def test_first_write_adds_markers(self, tmp_repo: Path, tmp_path: Path):
+        output_dir = tmp_path / "out"
+        output_dir.mkdir()
+        runner.invoke(app, [str(tmp_repo), "--format", "claude", "-o", str(output_dir)])
+        content = (output_dir / "CLAUDE.md").read_text()
+        assert "<!-- SAAR:AUTO-START -->" in content
+        assert "<!-- SAAR:AUTO-END -->" in content
+
+    def test_rerun_preserves_manual_edits(self, tmp_repo: Path, tmp_path: Path):
+        output_dir = tmp_path / "out"
+        output_dir.mkdir()
+        # first run
+        runner.invoke(app, [str(tmp_repo), "--format", "claude", "-o", str(output_dir)])
+        # developer adds a custom note after the auto block
+        target = output_dir / "CLAUDE.md"
+        target.write_text(target.read_text() + "\n## My Custom Notes\n- Never touch auth.py\n")
+        # second run
+        runner.invoke(app, [str(tmp_repo), "--format", "claude", "-o", str(output_dir)])
+        content = target.read_text()
+        assert "My Custom Notes" in content
+        assert "Never touch auth.py" in content
+
+    def test_force_discards_manual_edits(self, tmp_repo: Path, tmp_path: Path):
+        output_dir = tmp_path / "out"
+        output_dir.mkdir()
+        runner.invoke(app, [str(tmp_repo), "--format", "claude", "-o", str(output_dir)])
+        target = output_dir / "CLAUDE.md"
+        target.write_text(target.read_text() + "\n## My Custom Notes\n- Secret rule\n")
+        # --force should wipe manual edits
+        runner.invoke(app, [str(tmp_repo), "--format", "claude", "--force", "-o", str(output_dir)])
+        content = target.read_text()
+        assert "Secret rule" not in content

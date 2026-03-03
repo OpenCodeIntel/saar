@@ -1,6 +1,7 @@
+<!-- SAAR:AUTO-START -->
 # CLAUDE.md -- saar
 
-160 functions, 25 classes.
+164 functions, 26 classes.
 Async adoption: 16%.
 Type hint coverage: 89%.
 
@@ -34,9 +35,9 @@ These files have the most dependents -- understand them before editing:
 - `saar/dependency_analyzer.py` (2 dependents)
 - `saar/style_analyzer.py` (2 dependents)
 - `saar/extractor.py` (2 dependents)
-- `saar/formatters/agents_md.py` (2 dependents)
-- `saar/formatters/copilot.py` (2 dependents)
 - `saar/formatters/claude_md.py` (2 dependents)
+- `saar/formatters/copilot.py` (2 dependents)
+- `saar/formatters/cursorrules.py` (2 dependents)
 - `saar/formatters/__init__.py` (2 dependents)
 
 ## Error Handling
@@ -51,3 +52,4 @@ These files have the most dependents -- understand them before editing:
 - Mock with: unittest.mock
 - Shared fixtures live in `conftest.py`
 - Run: `pytest tests/ -v`
+<!-- SAAR:AUTO-END -->

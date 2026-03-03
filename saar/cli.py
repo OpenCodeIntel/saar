@@ -139,13 +139,11 @@ def extract(
         target = _resolve_output_path(fmt, output, repo_path)
 
         if target is None:
+            # markdown goes to stdout -- no markers needed
             console.print(text)
-        elif target.exists() and not force:
-            console.print(f"  [yellow]skipped[/yellow] {target} (exists, use --force to overwrite)")
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(text, encoding="utf-8")
-            console.print(f"  [green]wrote[/green] {target}")
+            _write_with_markers(target, text, force=force, console=console)
 
     console.print("[bold green]done[/bold green]")
 
@@ -163,3 +161,51 @@ def _resolve_output_path(
 
     base = output_dir if output_dir else repo_path
     return base / filename
+
+
+_MARKER_START = "<!-- SAAR:AUTO-START -->"
+_MARKER_END = "<!-- SAAR:AUTO-END -->"
+
+
+def _write_with_markers(
+    target: Path, generated: str, *, force: bool, console: Console
+) -> None:
+    """Write generated content to target, preserving human edits outside markers.
+
+    On first write: wraps content in SAAR:AUTO-START/END markers.
+    On re-run: replaces only what's between the markers. Content the developer
+    wrote outside the markers (before or after) is never touched.
+
+    --force bypasses preservation and overwrites the whole file. Use it when
+    you want a clean slate with no manual edits preserved.
+    """
+    wrapped = f"{_MARKER_START}\n{generated.rstrip()}\n{_MARKER_END}\n"
+
+    if not target.exists():
+        target.write_text(wrapped, encoding="utf-8")
+        console.print(f"  [green]wrote[/green] {target}")
+        return
+
+    existing = target.read_text(encoding="utf-8")
+
+    if force:
+        # full overwrite -- discard everything including manual edits
+        target.write_text(wrapped, encoding="utf-8")
+        console.print(f"  [green]overwrote[/green] {target}")
+        return
+
+    start_idx = existing.find(_MARKER_START)
+    end_idx = existing.find(_MARKER_END)
+
+    if start_idx == -1 or end_idx == -1:
+        # No markers -- file exists but was written before markers were introduced
+        # (or is purely hand-written). Treat it like first write: prepend auto block.
+        target.write_text(wrapped + "\n" + existing, encoding="utf-8")
+        console.print(f"  [green]updated[/green] {target} (prepended auto block)")
+        return
+
+    # Splice: keep everything before the start marker and after the end marker
+    before = existing[:start_idx]
+    after = existing[end_idx + len(_MARKER_END):]
+    target.write_text(before + wrapped + after, encoding="utf-8")
+    console.print(f"  [green]updated[/green] {target} (preserved manual edits)")
