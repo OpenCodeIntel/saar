@@ -1,9 +1,9 @@
 <!-- SAAR:AUTO-START -->
 # CLAUDE.md -- saar
 
-164 functions, 26 classes.
-Async adoption: 16%.
-Type hint coverage: 89%.
+201 functions, 32 classes.
+Async adoption: 14%.
+Type hint coverage: 91%.
 
 ## Coding Conventions
 
@@ -20,7 +20,9 @@ import re
 import tree_sitter_python as tspython
 import tree_sitter_javascript as tsjavascript
 from tree_sitter import Language, Parser
+from typing import Optional
 from collections import Counter
+from saar.formatters._tribal import render_tribal_knowledge
 ```
 
 ## Logging
@@ -31,14 +33,14 @@ from collections import Counter
 
 These files have the most dependents -- understand them before editing:
 
-- `saar/models.py` (9 dependents)
+- `saar/models.py` (12 dependents)
+- `saar/formatters/_tribal.py` (3 dependents)
+- `saar/formatters/agents_md.py` (3 dependents)
+- `saar/formatters/claude_md.py` (3 dependents)
 - `saar/dependency_analyzer.py` (2 dependents)
 - `saar/style_analyzer.py` (2 dependents)
+- `saar/interview.py` (2 dependents)
 - `saar/extractor.py` (2 dependents)
-- `saar/formatters/claude_md.py` (2 dependents)
-- `saar/formatters/copilot.py` (2 dependents)
-- `saar/formatters/cursorrules.py` (2 dependents)
-- `saar/formatters/__init__.py` (2 dependents)
 
 ## Error Handling
 
@@ -52,4 +54,26 @@ These files have the most dependents -- understand them before editing:
 - Mock with: unittest.mock
 - Shared fixtures live in `conftest.py`
 - Run: `pytest tests/ -v`
+
+## Tribal Knowledge
+
+*Captured via `saar` interview -- human knowledge static analysis cannot detect.*
+
+**This project:** CLI tool that extracts codebase DNA and generates AI context files (AGENTS.md, CLAUDE.md, .cursorrules)
+
+### Never Do
+
+- Never add external infrastructure dependencies (no Supabase, Redis, network calls). Never use print() -- always use logging. Never commit venv/ or dist/.
+
+### Domain Vocabulary
+
+- DNA = extracted architectural patterns of a codebase. Tribal knowledge = context only humans can provide (gotchas, domain terms, verification workflows).
+
+### Verification Workflow
+
+pytest tests/ -v -- all 121 tests must pass. Then: saar . --format agents --no-interview to verify CLI output is clean.
+
+### Additional Context
+
+This repo dogfoods itself -- always regenerate CLAUDE.md after formatter changes using: saar . --format claude --force --no-interview
 <!-- SAAR:AUTO-END -->

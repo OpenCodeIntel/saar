@@ -1,3 +1,6 @@
+# Saar interview cache (remove .saar/.gitignore to opt-in to committing this)
+.saar/
+
 # Python
 __pycache__/
 *.py[cod]

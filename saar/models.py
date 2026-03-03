@@ -2,9 +2,29 @@
 
 Each dataclass captures a specific category of patterns detected by
 tree-sitter AST analysis. CodebaseDNA is the top-level container.
+InterviewAnswers holds tribal knowledge captured via guided interview.
 """
 from dataclasses import asdict, dataclass, field
 from typing import Dict, List, Optional
+
+
+@dataclass
+class InterviewAnswers:
+    """Tribal knowledge captured via guided interview.
+
+    Static analysis cannot detect this content -- it requires a human.
+    Cached to .saar/config.json so re-runs don't re-ask.
+    """
+    # universal (quick mode -- always asked)
+    project_purpose: Optional[str] = None     # one-line description for role prompt
+    never_do: Optional[str] = None            # absolute rules, accumulated corrections
+    domain_terms: Optional[str] = None        # vocabulary with project-specific meanings
+    verify_workflow: Optional[str] = None     # how to verify changes actually work
+
+    # full mode extras
+    auth_gotchas: Optional[str] = None        # auth-specific anti-patterns
+    off_limits: Optional[str] = None          # files/modules AI must never touch
+    extra_context: Optional[str] = None       # anything else the developer wants captured
 
 
 @dataclass
@@ -105,6 +125,8 @@ class CodebaseDNA:
     router_pattern: Optional[str] = None
     team_rules: Optional[str] = None
     team_rules_source: Optional[str] = None
+    # interview -- tribal knowledge from guided questions
+    interview: Optional[InterviewAnswers] = None
     # style analysis enrichments
     async_adoption_pct: float = 0.0
     type_hint_pct: float = 0.0

@@ -82,6 +82,11 @@ def extract(
         "--force",
         help="Overwrite existing config files. Without this, existing files are skipped.",
     ),
+    no_interview: bool = typer.Option(
+        False,
+        "--no-interview", "--no-input", "-y",
+        help="Skip the guided interview. Uses cached answers if available.",
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose", "-v",
@@ -130,6 +135,18 @@ def extract(
     if dna is None:
         console.print("[red]Extraction failed. Use --verbose for details.[/red]")
         raise typer.Exit(code=1)
+
+    # -- guided interview -- captures tribal knowledge static analysis can't --
+    from saar.interview import run_interview
+
+    answers = run_interview(
+        dna=dna,
+        repo_path=repo_path,
+        no_interview=no_interview,
+        console=console,
+    )
+    if answers:
+        dna.interview = answers
 
     # -- format and output --
     from saar.formatters import render

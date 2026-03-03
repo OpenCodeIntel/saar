@@ -5,6 +5,7 @@ structured sections, actionable rules. Kept under ~300 lines per
 Anthropic's recommendation for CLAUDE.md files.
 """
 from saar.models import CodebaseDNA
+from saar.formatters._tribal import render_tribal_knowledge
 
 
 def render_claude_md(dna: CodebaseDNA) -> str:
@@ -132,6 +133,11 @@ def render_claude_md(dna: CodebaseDNA) -> str:
         lines.append("\n## Circular Dependencies (fix these)\n")
         for pair in dna.circular_dependencies[:5]:
             lines.append(f"- `{pair[0]}` <-> `{pair[1]}`")
+
+    # -- tribal knowledge from guided interview (highest value content) --
+    tribal = render_tribal_knowledge(dna.interview)
+    if tribal:
+        lines.append(tribal)
 
     # -- team rules (verbatim if they exist) --
     if dna.team_rules:

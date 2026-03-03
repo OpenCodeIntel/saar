@@ -10,6 +10,7 @@ tool can consume it, and tool-specific files (CLAUDE.md, .cursorrules) can
 be generated alongside it via --format all.
 """
 from saar.models import CodebaseDNA
+from saar.formatters._tribal import render_tribal_knowledge
 
 
 def render_agents_md(dna: CodebaseDNA) -> str:
@@ -157,6 +158,11 @@ def render_agents_md(dna: CodebaseDNA) -> str:
         lines.append("\n## Circular Dependencies (resolve before adding more)\n")
         for pair in dna.circular_dependencies[:5]:
             lines.append(f"- `{pair[0]}` <-> `{pair[1]}`")
+
+    # -- tribal knowledge from guided interview (highest value content) --
+    tribal = render_tribal_knowledge(dna.interview)
+    if tribal:
+        lines.append(tribal)
 
     # -- team rules verbatim --
     if dna.team_rules:
