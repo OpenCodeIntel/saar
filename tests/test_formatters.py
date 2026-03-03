@@ -6,6 +6,7 @@ No disk I/O needed -- pass the fixture directly.
 import pytest
 
 from saar.formatters import render
+from saar.formatters.agents_md import render_agents_md
 from saar.formatters.markdown import render_markdown
 from saar.formatters.claude_md import render_claude_md
 from saar.formatters.cursorrules import render_cursorrules
@@ -19,6 +20,10 @@ class TestRenderDispatch:
     def test_dispatch_markdown(self, sample_dna: CodebaseDNA):
         out = render(sample_dna, "markdown")
         assert "Codebase DNA" in out
+
+    def test_dispatch_agents(self, sample_dna: CodebaseDNA):
+        out = render(sample_dna, "agents")
+        assert "AGENTS.md" in out
 
     def test_dispatch_claude(self, sample_dna: CodebaseDNA):
         out = render(sample_dna, "claude")
@@ -160,4 +165,45 @@ class TestCopilotFormatter:
 
     def test_empty_dna_no_crash(self, empty_dna: CodebaseDNA):
         out = render_copilot(empty_dna)
+        assert "empty-project" in out
+
+
+class TestAgentsMdFormatter:
+    """AGENTS.md is the cross-tool default format."""
+
+    def test_includes_repo_name(self, sample_dna: CodebaseDNA):
+        out = render_agents_md(sample_dna)
+        assert "AGENTS.md" in out
+        assert sample_dna.repo_name in out
+
+    def test_includes_saar_attribution(self, sample_dna: CodebaseDNA):
+        # generated files should point back to getsaar.com
+        out = render_agents_md(sample_dna)
+        assert "getsaar.com" in out
+
+    def test_includes_coding_conventions(self, sample_dna: CodebaseDNA):
+        out = render_agents_md(sample_dna)
+        assert "snake_case" in out
+        assert "PascalCase" in out
+
+    def test_includes_language_distribution(self, sample_dna: CodebaseDNA):
+        out = render_agents_md(sample_dna)
+        assert "Languages" in out
+        assert "python" in out
+
+    def test_includes_critical_files(self, sample_dna: CodebaseDNA):
+        out = render_agents_md(sample_dna)
+        assert "Critical Files" in out
+
+    def test_includes_testing(self, sample_dna: CodebaseDNA):
+        out = render_agents_md(sample_dna)
+        assert "pytest" in out
+
+    def test_includes_logging(self, sample_dna: CodebaseDNA):
+        out = render_agents_md(sample_dna)
+        assert "Logging" in out
+
+    def test_empty_dna_no_crash(self, empty_dna: CodebaseDNA):
+        out = render_agents_md(empty_dna)
+        assert "AGENTS.md" in out
         assert "empty-project" in out

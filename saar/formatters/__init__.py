@@ -4,6 +4,7 @@ Each formatter takes a CodebaseDNA and returns a string in the
 target format. The render() function dispatches to the right one.
 """
 from saar.models import CodebaseDNA
+from saar.formatters.agents_md import render_agents_md
 from saar.formatters.markdown import render_markdown
 from saar.formatters.claude_md import render_claude_md
 from saar.formatters.cursorrules import render_cursorrules
@@ -11,6 +12,7 @@ from saar.formatters.copilot import render_copilot
 
 
 _RENDERERS = {
+    "agents": render_agents_md,
     "markdown": render_markdown,
     "claude": render_claude_md,
     "cursorrules": render_cursorrules,

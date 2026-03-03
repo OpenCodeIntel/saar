@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 class OutputFormat(str, Enum):
     """Supported output formats."""
+    agents = "agents"
     markdown = "markdown"
     claude = "claude"
     cursorrules = "cursorrules"
@@ -38,6 +39,7 @@ class OutputFormat(str, Enum):
 
 # Maps output format -> the config file it writes (for inception prevention)
 _FORMAT_FILENAMES = {
+    OutputFormat.agents: "AGENTS.md",
     OutputFormat.claude: "CLAUDE.md",
     OutputFormat.cursorrules: ".cursorrules",
     OutputFormat.copilot: ".github/copilot-instructions.md",
@@ -61,9 +63,9 @@ def extract(
         resolve_path=True,
     ),
     format: OutputFormat = typer.Option(
-        OutputFormat.markdown,
+        OutputFormat.agents,
         "--format", "-f",
-        help="Output format.",
+        help="Output format. Default: agents (AGENTS.md -- cross-tool standard).",
     ),
     output: Optional[Path] = typer.Option(
         None,
@@ -102,7 +104,12 @@ def extract(
     # Determine which config files we're writing so we don't read
     # them as "team rules" input (prevents inception loop)
     if format == OutputFormat.all:
-        target_formats = [OutputFormat.claude, OutputFormat.cursorrules, OutputFormat.copilot]
+        target_formats = [
+            OutputFormat.agents,
+            OutputFormat.claude,
+            OutputFormat.cursorrules,
+            OutputFormat.copilot,
+        ]
     else:
         target_formats = [format]
 

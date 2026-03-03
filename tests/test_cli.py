@@ -20,11 +20,27 @@ class TestCLI:
         assert result.exit_code == 0
         assert "Extract" in result.stdout or "extract" in result.stdout
 
-    def test_extract_stdout(self, tmp_repo: Path):
-        """Default format (markdown) should print to stdout."""
-        result = runner.invoke(app, [str(tmp_repo)])
+    def test_extract_stdout(self, tmp_repo: Path, tmp_path: Path):
+        """Default format (agents) writes AGENTS.md to the repo."""
+        output_dir = tmp_path / "out"
+        output_dir.mkdir()
+        result = runner.invoke(app, [str(tmp_repo), "-o", str(output_dir)])
+        assert result.exit_code == 0
+        assert (output_dir / "AGENTS.md").exists()
+
+    def test_extract_markdown_stdout(self, tmp_repo: Path):
+        """--format markdown still prints to stdout."""
+        result = runner.invoke(app, [str(tmp_repo), "--format", "markdown"])
         assert result.exit_code == 0
         assert "Codebase DNA" in result.stdout
+
+    def test_extract_agents_format(self, tmp_repo: Path, tmp_path: Path):
+        """--format agents writes AGENTS.md."""
+        output_dir = tmp_path / "out"
+        output_dir.mkdir()
+        result = runner.invoke(app, [str(tmp_repo), "--format", "agents", "-o", str(output_dir)])
+        assert result.exit_code == 0
+        assert (output_dir / "AGENTS.md").exists()
 
     def test_extract_claude_format(self, tmp_repo: Path, tmp_path: Path):
         """--format claude should write CLAUDE.md."""

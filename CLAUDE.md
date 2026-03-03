@@ -1,7 +1,7 @@
 # CLAUDE.md -- saar
 
-144 functions, 24 classes.
-Async adoption: 17%.
+160 functions, 25 classes.
+Async adoption: 16%.
 Type hint coverage: 89%.
 
 ## Coding Conventions
@@ -30,14 +30,14 @@ from collections import Counter
 
 These files have the most dependents -- understand them before editing:
 
-- `saar/models.py` (8 dependents)
+- `saar/models.py` (9 dependents)
 - `saar/dependency_analyzer.py` (2 dependents)
 - `saar/style_analyzer.py` (2 dependents)
 - `saar/extractor.py` (2 dependents)
-- `saar/formatters/__init__.py` (2 dependents)
+- `saar/formatters/agents_md.py` (2 dependents)
 - `saar/formatters/copilot.py` (2 dependents)
-- `saar/formatters/markdown.py` (2 dependents)
 - `saar/formatters/claude_md.py` (2 dependents)
+- `saar/formatters/__init__.py` (2 dependents)
 
 ## Error Handling
 
