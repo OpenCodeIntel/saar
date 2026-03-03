@@ -22,9 +22,30 @@ app = typer.Typer(
     name="saar",
     help="Extract the essence of your codebase.",
     no_args_is_help=True,
+    # allow 'saar .' to work without typing 'saar extract .'
+    invoke_without_command=False,
 )
 console = Console()
 logger = logging.getLogger(__name__)
+
+
+def version_callback(value: bool) -> None:
+    if value:
+        console.print(f"saar {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version", "-V",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit.",
+    ),
+) -> None:
+    """saar -- extract the essence of your codebase."""
 
 
 class OutputFormat(str, Enum):
@@ -46,10 +67,85 @@ _FORMAT_FILENAMES = {
 }
 
 
-def version_callback(value: bool) -> None:
-    if value:
-        console.print(f"saar {__version__}")
-        raise typer.Exit()
+def version_callback_old(value: bool) -> None:
+    # moved to app-level @app.callback() -- kept for reference, not used
+    pass
+
+
+@app.command()
+def add(
+    correction: str = typer.Argument(
+        ...,
+        help="The rule, correction, or context to add.",
+    ),
+    repo_path: Path = typer.Option(
+        Path("."),
+        "--repo", "-r",
+        help="Path to the repository. Defaults to current directory.",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+    never_do: bool = typer.Option(
+        False, "--never-do", "-n",
+        help="Add as a never-do rule (default category).",
+    ),
+    domain: bool = typer.Option(
+        False, "--domain", "-d",
+        help="Add as a domain vocabulary term.",
+    ),
+    off_limits: bool = typer.Option(
+        False, "--off-limits", "-x",
+        help="Add as an off-limits file or module.",
+    ),
+    verify: bool = typer.Option(
+        False, "--verify", "-w",
+        help="Set the verification workflow.",
+    ),
+    context: bool = typer.Option(
+        False, "--context", "-c",
+        help="Add as additional context.",
+    ),
+) -> None:
+    """Add a single rule or correction to tribal knowledge -- no re-analysis needed.
+
+    Examples:
+
+      saar add "Never use async def with boto3 -- blocks the event loop"
+
+      saar add --domain "Workspace = tenant, not a directory"
+
+      saar add --off-limits "core/auth.py -- clock-skew workaround, do not touch"
+
+      saar add --verify "pytest -x && docker compose up && curl localhost:8000/health"
+    """
+    from saar.interview import append_to_cache
+
+    # determine target field -- default is never_do (most valuable per Boris Cherny)
+    if domain:
+        field = "domain_terms"
+        label = "Domain vocabulary"
+    elif off_limits:
+        field = "off_limits"
+        label = "Off-limits"
+    elif verify:
+        field = "verify_workflow"
+        label = "Verification workflow"
+    elif context:
+        field = "extra_context"
+        label = "Additional context"
+    else:
+        # default: never_do -- this is the correction workflow
+        field = "never_do"
+        label = "Never do"
+
+    updated = append_to_cache(repo_path, field, correction)
+    console.print(f"  [green]added[/green] [{label}] {correction}")
+    console.print(
+        f"  [dim]Saved to {repo_path / '.saar/config.json'}. "
+        f"Re-run [bold]saar .[/bold] to regenerate context files.[/dim]"
+    )
 
 
 @app.command()
@@ -91,13 +187,6 @@ def extract(
         False,
         "--verbose", "-v",
         help="Show detailed analysis progress.",
-    ),
-    version: Optional[bool] = typer.Option(
-        None,
-        "--version", "-V",
-        callback=version_callback,
-        is_eager=True,
-        help="Show version and exit.",
     ),
 ) -> None:
     """Analyze a codebase and extract its architectural DNA."""

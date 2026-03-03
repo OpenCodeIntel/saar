@@ -260,3 +260,108 @@ class TestTribalKnowledgeInFormatters:
         out = render_tribal_knowledge(answers)
         assert "Verification Workflow" in out
         assert "pytest -x" in out
+
+
+# -- append_to_cache (saar add) --------------------------------------------
+
+class TestAppendToCache:
+
+    def test_append_creates_cache_if_missing(self, tmp_path: Path):
+        from saar.interview import append_to_cache
+        result = append_to_cache(tmp_path, "never_do", "Never use print()")
+        assert result.never_do is not None
+        assert "Never use print()" in result.never_do
+
+    def test_append_to_empty_field(self, tmp_path: Path):
+        from saar.interview import append_to_cache
+        result = append_to_cache(tmp_path, "domain_terms", "Workspace = tenant")
+        assert "Workspace = tenant" in result.domain_terms
+
+    def test_append_to_existing_field_merges(self, tmp_path: Path):
+        from saar.interview import append_to_cache
+        append_to_cache(tmp_path, "never_do", "Never use print()")
+        result = append_to_cache(tmp_path, "never_do", "Never modify billing/")
+        assert "Never use print()" in result.never_do
+        assert "Never modify billing/" in result.never_do
+
+    def test_multiple_appends_are_bullet_list(self, tmp_path: Path):
+        from saar.interview import append_to_cache
+        append_to_cache(tmp_path, "never_do", "Rule one")
+        append_to_cache(tmp_path, "never_do", "Rule two")
+        result = append_to_cache(tmp_path, "never_do", "Rule three")
+        lines = [l.strip() for l in result.never_do.splitlines() if l.strip()]
+        assert len(lines) == 3
+        assert all(l.startswith("- ") for l in lines)
+
+    def test_append_persists_to_disk(self, tmp_path: Path):
+        from saar.interview import append_to_cache, load_cached
+        append_to_cache(tmp_path, "off_limits", "core/auth.py")
+        loaded = load_cached(tmp_path)
+        assert loaded is not None
+        assert "core/auth.py" in loaded.off_limits
+
+    def test_append_does_not_touch_other_fields(self, tmp_path: Path, sample_answers: InterviewAnswers):
+        from saar.interview import append_to_cache, save_cache
+        save_cache(tmp_path, sample_answers)
+        result = append_to_cache(tmp_path, "never_do", "New rule")
+        # other fields should be unchanged
+        assert result.project_purpose == sample_answers.project_purpose
+        assert result.domain_terms == sample_answers.domain_terms
+        assert result.verify_workflow == sample_answers.verify_workflow
+
+
+# -- saar add CLI command --------------------------------------------------
+
+class TestSaarAddCommand:
+
+    def test_add_default_goes_to_never_do(self, tmp_path: Path):
+        from typer.testing import CliRunner
+        from saar.cli import app
+        from saar.interview import load_cached
+        runner = CliRunner()
+        result = runner.invoke(app, ["add", "Never modify billing/", "--repo", str(tmp_path)])
+        assert result.exit_code == 0
+        assert "added" in result.stdout
+        cached = load_cached(tmp_path)
+        assert cached is not None
+        assert "Never modify billing/" in cached.never_do
+
+    def test_add_domain_flag(self, tmp_path: Path):
+        from typer.testing import CliRunner
+        from saar.cli import app
+        from saar.interview import load_cached
+        runner = CliRunner()
+        result = runner.invoke(app, ["add", "Workspace = tenant", "--domain", "--repo", str(tmp_path)])
+        assert result.exit_code == 0
+        cached = load_cached(tmp_path)
+        assert cached.domain_terms is not None
+        assert "Workspace = tenant" in cached.domain_terms
+
+    def test_add_off_limits_flag(self, tmp_path: Path):
+        from typer.testing import CliRunner
+        from saar.cli import app
+        from saar.interview import load_cached
+        runner = CliRunner()
+        result = runner.invoke(app, ["add", "core/auth.py", "--off-limits", "--repo", str(tmp_path)])
+        assert result.exit_code == 0
+        cached = load_cached(tmp_path)
+        assert "core/auth.py" in cached.off_limits
+
+    def test_add_multiple_corrections_stack(self, tmp_path: Path):
+        from typer.testing import CliRunner
+        from saar.cli import app
+        from saar.interview import load_cached
+        runner = CliRunner()
+        runner.invoke(app, ["add", "Rule one", "--repo", str(tmp_path)])
+        runner.invoke(app, ["add", "Rule two", "--repo", str(tmp_path)])
+        cached = load_cached(tmp_path)
+        assert "Rule one" in cached.never_do
+        assert "Rule two" in cached.never_do
+
+    def test_add_shows_confirmation(self, tmp_path: Path):
+        from typer.testing import CliRunner
+        from saar.cli import app
+        runner = CliRunner()
+        result = runner.invoke(app, ["add", "Never use sync with boto3", "--repo", str(tmp_path)])
+        assert result.exit_code == 0
+        assert "Never use sync with boto3" in result.stdout

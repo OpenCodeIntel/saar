@@ -146,6 +146,32 @@ def _build_detection_summary(dna: CodebaseDNA) -> str:
 
 # -- the interview ---------------------------------------------------------
 
+
+def append_to_cache(repo_path: Path, field: str, value: str) -> InterviewAnswers:
+    """Append a single correction to one field in the cached answers.
+
+    If no cache exists, creates one with just this field set.
+    If the field already has content, appends as a new bullet point.
+    Returns the updated InterviewAnswers.
+    """
+    existing = load_cached(repo_path) or InterviewAnswers()
+
+    current = getattr(existing, field, None)
+
+    if current:
+        # normalize existing content to bullet list then append
+        lines = [l.strip() for l in current.strip().splitlines() if l.strip()]
+        cleaned = [l.lstrip("- ").lstrip("* ").strip() for l in lines]
+        cleaned.append(value.strip())
+        merged = "\n".join(f"- {l}" for l in cleaned)
+    else:
+        merged = f"- {value.strip()}"
+
+    setattr(existing, field, merged)
+    save_cache(repo_path, existing)
+    return existing
+
+
 def run_interview(
     dna: CodebaseDNA,
     repo_path: Path,
