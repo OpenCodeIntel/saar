@@ -30,6 +30,8 @@ def render_claude_md(dna: CodebaseDNA) -> str:
         lines.append(f"- Use `{nc.function_style}` for function names")
     if nc.class_style != "unknown":
         lines.append(f"- Use `{nc.class_style}` for class names")
+    if nc.constant_style != "unknown":
+        lines.append(f"- Use `{nc.constant_style}` for constants")
     if nc.file_style != "unknown":
         lines.append(f"- Use `{nc.file_style}` for file names")
 
@@ -39,6 +41,26 @@ def render_claude_md(dna: CodebaseDNA) -> str:
         for imp in dna.common_imports[:10]:
             lines.append(imp)
         lines.append("```")
+
+    # -- logging conventions --
+    lp = dna.logging_patterns
+    if lp.logger_import or lp.log_levels_used:
+        lines.append("\n## Logging\n")
+        if lp.logger_import:
+            lines.append(f"- Use `{lp.logger_import}` for all logging, never `print()`")
+        if lp.structured_logging:
+            lines.append("- Use structured logging (JSON format)")
+
+    # -- critical files / project structure --
+    if dna.critical_files:
+        lines.append("\n## Critical Files\n")
+        lines.append("These files have the most dependents -- understand them before editing:\n")
+        for cf in dna.critical_files[:8]:
+            f = cf.get("file", "") if isinstance(cf, dict) else cf
+            d = cf.get("dependents", 0) if isinstance(cf, dict) else 0
+            if f:
+                dep_note = f" ({d} dependents)" if d else ""
+                lines.append(f"- `{f}`{dep_note}")
 
     # -- architecture rules --
     if dna.service_patterns.singleton_services or dna.auth_patterns.middleware_used:
@@ -74,7 +96,7 @@ def render_claude_md(dna: CodebaseDNA) -> str:
 
     # -- error handling rules --
     ep = dna.error_patterns
-    if ep.exception_classes or ep.http_exception_usage:
+    if ep.exception_classes or ep.http_exception_usage or ep.logging_on_error:
         lines.append("\n## Error Handling\n")
         if ep.exception_classes:
             lines.append(f"- Use existing exceptions: `{', '.join(ep.exception_classes)}`")
@@ -93,6 +115,9 @@ def render_claude_md(dna: CodebaseDNA) -> str:
             lines.append(f"- Fixture style: {tp.fixture_style}")
         if tp.mock_library:
             lines.append(f"- Mock with: {tp.mock_library}")
+        if tp.has_conftest:
+            lines.append("- Shared fixtures live in `conftest.py`")
+        lines.append("- Run: `pytest tests/ -v`")
 
     # -- API patterns --
     if dna.api_versioning or dna.router_pattern:
