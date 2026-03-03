@@ -50,8 +50,21 @@ class DNAExtractor:
     """
 
     SKIP_DIRS = {
-        "node_modules", ".git", "__pycache__", "venv", "env", "dist",
-        "build", ".next", "coverage", ".venv", "site-packages",
+        # version control
+        ".git",
+        # python
+        "__pycache__", "venv", "env", ".venv", "site-packages",
+        "*.egg-info", ".eggs",
+        # js/ts
+        "node_modules", ".next", ".nuxt", ".svelte-kit",
+        # build outputs
+        "dist", "build", "out", "target",
+        # test/coverage artifacts
+        "coverage", ".pytest_cache", "htmlcov", ".nyc_output",
+        # common data / cloned repo dirs that aren't project code
+        "repos", "data", "datasets", "tmp", "temp", "cache",
+        # ide
+        ".idea", ".vscode",
     }
     MAX_FILE_SIZE = 1024 * 1024  # 1MB
     MAX_FILES = 5000
@@ -168,33 +181,35 @@ class DNAExtractor:
             ".ts": "typescript", ".tsx": "typescript",
         }.get(ext, "unknown")
 
-    def _read_gitignore_dirs(self, repo_path: Path) -> set:
-        """Parse .gitignore for directory patterns to skip.
+    def _read_ignore_dirs(self, repo_path: Path) -> set:
+        """Parse .gitignore and .saarignore for directory patterns to skip.
 
-        Only extracts simple directory names (like 'repos/' or 'data/').
-        Does not handle globs or negation -- those need a full gitignore parser.
+        Reads both files and merges results. Only handles simple directory
+        names and trailing-slash patterns -- no glob negation. A full
+        gitignore-spec parser is overkill for our use case.
         """
         dirs: set = set()
-        gitignore = repo_path / ".gitignore"
-        if not gitignore.exists():
-            return dirs
-        try:
-            for line in gitignore.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                # lines ending with / are directories
-                if line.endswith("/"):
-                    dirs.add(line.rstrip("/"))
-                # bare names that exist as dirs
-                elif "/" not in line and "*" not in line and "!" not in line:
-                    candidate = repo_path / line
-                    if candidate.is_dir():
-                        dirs.add(line)
-        except Exception as e:
-            logger.debug("Error reading .gitignore: %s", e)
+        # check both ignore files -- .saarignore takes same syntax as .gitignore
+        for ignore_file in [repo_path / ".gitignore", repo_path / ".saarignore"]:
+            if not ignore_file.exists():
+                continue
+            try:
+                for line in ignore_file.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    # lines ending with / are explicitly directories
+                    if line.endswith("/"):
+                        dirs.add(line.rstrip("/"))
+                    # bare names without glob chars that exist as dirs in the repo
+                    elif "/" not in line and "*" not in line and "!" not in line:
+                        candidate = repo_path / line
+                        if candidate.is_dir():
+                            dirs.add(line)
+            except Exception as e:
+                logger.debug("Error reading %s: %s", ignore_file.name, e)
         if dirs:
-            logger.info("Gitignore dirs to skip: %s", dirs)
+            logger.debug("Ignore file dirs to skip: %s", dirs)
         return dirs
 
     # -- team rules -------------------------------------------------------
@@ -652,8 +667,13 @@ class DNAExtractor:
         skip = set(self.SKIP_DIRS)
         if exclude_dirs:
             skip.update(exclude_dirs)
-        skip.update(self._read_gitignore_dirs(path))
+        skip.update(self._read_ignore_dirs(path))
         self._active_skip_dirs = skip
+
+        # show user-added skips at info level so --verbose surfaces them
+        extra_skips = skip - self.SKIP_DIRS
+        if extra_skips:
+            logger.info("Extra dirs excluded: %s", sorted(extra_skips))
 
         self._reset_cache()
         repo_name = path.name
