@@ -73,6 +73,72 @@ def version_callback_old(value: bool) -> None:
 
 
 @app.command()
+def enrich(
+    repo_path: Path = typer.Option(
+        Path("."),
+        "--repo", "-r",
+        help="Path to the repository. Defaults to current directory.",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+    api_key: Optional[str] = typer.Option(
+        None,
+        "--api-key",
+        help="Anthropic API key. Defaults to ANTHROPIC_API_KEY env var.",
+        envvar="ANTHROPIC_API_KEY",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show enriched output without saving to cache.",
+    ),
+) -> None:
+    """Use Claude to tighten raw interview answers into precise, actionable rules.
+
+    Reads from .saar/config.json, enriches with AI, saves back.
+    Requires ANTHROPIC_API_KEY environment variable.
+
+    Example:
+
+      saar add "don't touch billing it's messy"
+
+      saar enrich
+
+      # billing/ rule is now: "NEVER modify `billing/` -- legacy integration,
+      #   no test coverage, frozen until Q3 migration"
+    """
+    from saar.interview import load_cached, save_cache
+    from saar.enricher import enrich_answers
+
+    answers = load_cached(repo_path)
+    if not answers:
+        console.print("[yellow]No cached interview answers found.[/yellow]")
+        console.print(f"[dim]Run [bold]saar extract {repo_path}[/bold] first, or use [bold]saar add[/bold] to add rules.[/dim]")
+        raise typer.Exit(code=1)
+
+    console.print("[bold]saar[/bold] enriching tribal knowledge via Claude...")
+
+    enriched, was_enriched = enrich_answers(answers, dna=None, api_key=api_key)
+
+    if not was_enriched:
+        console.print("[yellow]Enrichment skipped.[/yellow] Check ANTHROPIC_API_KEY is set.")
+        raise typer.Exit(code=1)
+
+    if dry_run:
+        console.print("\n[bold]Enriched output (dry run -- not saved):[/bold]\n")
+        from saar.formatters._tribal import render_tribal_knowledge
+        console.print(render_tribal_knowledge(enriched))
+        return
+
+    save_cache(repo_path, enriched)
+    console.print("[bold green]done[/bold green] -- tribal knowledge enriched and saved.")
+    console.print(f"[dim]Re-run [bold]saar extract .[/bold] --no-interview to regenerate context files.[/dim]")
+    pass
+
+
+@app.command()
 def add(
     correction: str = typer.Argument(
         ...,
@@ -183,6 +249,11 @@ def extract(
         "--no-interview", "--no-input", "-y",
         help="Skip the guided interview. Uses cached answers if available.",
     ),
+    enrich_flag: bool = typer.Option(
+        False,
+        "--enrich",
+        help="After interview, use Claude AI to tighten rules. Requires ANTHROPIC_API_KEY.",
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose", "-v",
@@ -226,7 +297,7 @@ def extract(
         raise typer.Exit(code=1)
 
     # -- guided interview -- captures tribal knowledge static analysis can't --
-    from saar.interview import run_interview
+    from saar.interview import run_interview, save_cache
 
     answers = run_interview(
         dna=dna,
@@ -234,6 +305,19 @@ def extract(
         no_interview=no_interview,
         console=console,
     )
+
+    # -- optional AI enrichment -- tightens raw answers into precise rules --
+    if answers and enrich_flag:
+        from saar.enricher import enrich_answers
+        console.print("[dim]Enriching tribal knowledge via Claude...[/dim]")
+        enriched, was_enriched = enrich_answers(answers, dna=dna)
+        if was_enriched:
+            answers = enriched
+            save_cache(repo_path, answers)
+            console.print("[dim]Enrichment complete.[/dim]")
+        else:
+            console.print("[yellow]Enrichment skipped -- check ANTHROPIC_API_KEY.[/yellow]")
+
     if answers:
         dna.interview = answers
 

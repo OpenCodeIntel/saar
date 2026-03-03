@@ -43,6 +43,10 @@ dev = [
     "pytest-cov>=5.0.0",
     "ruff>=0.5.0",
 ]
+enrich = [
+    # AI post-processing of interview answers -- requires ANTHROPIC_API_KEY
+    "anthropic>=0.80.0",
+]
 
 [project.scripts]
 saar = "saar.cli:app"

@@ -1,9 +1,9 @@
 <!-- SAAR:AUTO-START -->
 # CLAUDE.md -- saar
 
-217 functions, 34 classes.
-Async adoption: 18%.
-Type hint coverage: 91%.
+245 functions, 38 classes.
+Async adoption: 17%.
+Type hint coverage: 92%.
 
 ## Coding Conventions
 
@@ -13,16 +13,16 @@ Type hint coverage: 91%.
 
 Preferred imports:
 ```
-from saar.models import CodebaseDNA
 import logging
+from saar.models import CodebaseDNA
 from pathlib import Path
+from typing import Optional
 import re
 import tree_sitter_python as tspython
 import tree_sitter_javascript as tsjavascript
 from tree_sitter import Language, Parser
-from typing import Optional
-from collections import Counter
-from saar.formatters._tribal import render_tribal_knowledge
+import json
+import os
 ```
 
 ## Logging
@@ -33,14 +33,14 @@ from saar.formatters._tribal import render_tribal_knowledge
 
 These files have the most dependents -- understand them before editing:
 
-- `saar/models.py` (12 dependents)
-- `saar/formatters/agents_md.py` (3 dependents)
-- `saar/formatters/_tribal.py` (3 dependents)
+- `saar/models.py` (14 dependents)
+- `saar/formatters/_tribal.py` (4 dependents)
+- `saar/cli.py` (3 dependents)
+- `saar/interview.py` (3 dependents)
 - `saar/formatters/claude_md.py` (3 dependents)
+- `saar/formatters/agents_md.py` (3 dependents)
 - `saar/dependency_analyzer.py` (2 dependents)
 - `saar/style_analyzer.py` (2 dependents)
-- `saar/interview.py` (2 dependents)
-- `saar/cli.py` (2 dependents)
 
 ## Error Handling
 
