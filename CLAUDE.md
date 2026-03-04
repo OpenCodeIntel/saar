@@ -1,7 +1,7 @@
 <!-- SAAR:AUTO-START -->
 # CLAUDE.md -- saar
 
-282 functions, 47 classes.
+289 functions, 48 classes.
 Async adoption: 20%.
 Type hint coverage: 92%.
 

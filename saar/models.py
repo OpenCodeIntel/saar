@@ -107,6 +107,13 @@ class FrontendPattern:
     package_manager: Optional[str] = None   # bun, pnpm, yarn, npm
     build_tool: Optional[str] = None        # vite, webpack, turbopack
     language: Optional[str] = None          # typescript, javascript
+    # React-specific coding patterns (detected from .tsx/.ts source files)
+    uses_react_query: bool = False           # useQuery/useMutation detected in source
+    avoids_fetch_in_effect: bool = False     # no raw fetch inside useEffect
+    uses_cn_utility: bool = False            # cn() from @/lib/utils for class merging
+    canonical_data_hook: Optional[str] = None  # most-used custom data hook
+    has_custom_hooks: bool = False           # hooks/ directory with use* files
+    shared_types_file: Optional[str] = None # types.ts / types/ directory found
 
 
 @dataclass

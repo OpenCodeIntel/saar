@@ -53,6 +53,18 @@ def render_claude_md(dna: CodebaseDNA) -> str:
                 test_line += f" (`{fp.test_command}`)"
             lines.append(test_line)
 
+        # React-specific coding patterns detected from source files
+        if fp.uses_react_query:
+            lines.append("- Data fetching: use `useQuery`/`useMutation` -- never raw `fetch` in `useEffect`")
+        if fp.uses_cn_utility:
+            lines.append("- Class merging: use `cn()` from `@/lib/utils` for conditional Tailwind classes")
+        if fp.has_custom_hooks and fp.canonical_data_hook:
+            lines.append(f"- Custom hooks in `hooks/` -- canonical example: `{fp.canonical_data_hook}`")
+        elif fp.has_custom_hooks:
+            lines.append("- Custom hooks live in `hooks/` with `use` prefix")
+        if fp.shared_types_file:
+            lines.append(f"- Shared TypeScript interfaces in `{fp.shared_types_file}` -- don't duplicate inline")
+
     # -- coding conventions as imperative rules --
     lines.append("## Coding Conventions\n")
     nc = dna.naming_conventions

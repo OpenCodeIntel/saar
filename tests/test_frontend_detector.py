@@ -287,3 +287,100 @@ class TestFrontendInFormatters:
         dna = CodebaseDNA(repo_name="python-only")
         out = render_agents_md(dna)
         assert "## Frontend" not in out
+
+
+class TestReactPatternDetection:
+
+    def test_detects_react_query_usage(self, tmp_path: Path):
+        _write_pkg(tmp_path, {"react": "^18", "@tanstack/react-query": "^5"})
+        # need 2+ files with useQuery to pass the threshold
+        (tmp_path / "useUser.tsx").write_text(
+            "import { useQuery } from '@tanstack/react-query';\n"
+            "export const useUser = (id) => useQuery({ queryKey: ['user', id] });\n"
+        )
+        (tmp_path / "useRepos.tsx").write_text(
+            "import { useQuery } from '@tanstack/react-query';\n"
+            "export const useRepos = () => useQuery({ queryKey: ['repos'] });\n"
+        )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.frontend_patterns.uses_react_query is True
+
+    def test_detects_cn_utility(self, tmp_path: Path):
+        _write_pkg(tmp_path, {"react": "^18"})
+        (tmp_path / "Button.tsx").write_text(
+            "import { cn } from '@/lib/utils';\n"
+            "export const Button = ({ className }) => (\n"
+            "  <button className={cn('btn', className)}>click</button>\n"
+            ");\n"
+        )
+        (tmp_path / "Card.tsx").write_text(
+            "import { cn } from '@/lib/utils';\n"
+            "export const Card = ({ cls }) => <div className={cn('card', cls)} />;\n"
+        )
+        (tmp_path / "Input.tsx").write_text(
+            "import { cn } from '@/lib/utils';\n"
+            "export const Input = ({ cls }) => <input className={cn('input', cls)} />;\n"
+        )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.frontend_patterns.uses_cn_utility is True
+
+    def test_detects_custom_hooks(self, tmp_path: Path):
+        _write_pkg(tmp_path, {"react": "^18"})
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        (hooks_dir / "useAuth.ts").write_text("export const useAuth = () => ({});")
+        (hooks_dir / "useRepos.ts").write_text("export const useRepos = () => ({});")
+        (tmp_path / "app.tsx").write_text("const x = 1;")
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.frontend_patterns.has_custom_hooks is True
+
+    def test_detects_canonical_hook(self, tmp_path: Path):
+        _write_pkg(tmp_path, {"react": "^18", "@tanstack/react-query": "^5"})
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        (hooks_dir / "useCachedQuery.ts").write_text("export const useCachedQuery = () => ({});")
+        # import useCachedQuery in 3 different components
+        for i in range(3):
+            (tmp_path / f"Component{i}.tsx").write_text(
+                "import { useCachedQuery } from '../hooks/useCachedQuery';\n"
+                "export const C = () => { const d = useCachedQuery(); return null; };\n"
+            )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.frontend_patterns.has_custom_hooks is True
+        assert dna.frontend_patterns.canonical_data_hook == "useCachedQuery"
+
+    def test_detects_shared_types_file(self, tmp_path: Path):
+        _write_pkg(tmp_path, {"react": "^18"})
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "types.ts").write_text("export interface User { id: string; }")
+        (tmp_path / "app.tsx").write_text("const x = 1;")
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.frontend_patterns.shared_types_file == "src/types.ts"
+
+    def test_react_patterns_rendered_in_agents_md(self, tmp_path: Path):
+        from saar.formatters.agents_md import render_agents_md
+        from saar.models import CodebaseDNA, FrontendPattern
+
+        dna = CodebaseDNA(
+            repo_name="test",
+            frontend_patterns=FrontendPattern(
+                framework="React",
+                uses_react_query=True,
+                uses_cn_utility=True,
+                has_custom_hooks=True,
+                canonical_data_hook="useCachedQuery",
+                shared_types_file="src/types.ts",
+            )
+        )
+        out = render_agents_md(dna)
+        assert "useQuery" in out
+        assert "useEffect" in out
+        assert "cn()" in out
+        assert "useCachedQuery" in out
+        assert "src/types.ts" in out

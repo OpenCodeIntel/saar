@@ -838,7 +838,100 @@ class DNAExtractor:
         elif "sass" in combined or "node-sass" in combined:
             fp.styling = "Sass/SCSS"
 
+        # -- React coding patterns from actual source files --
+        # scan .tsx/.ts/.jsx files to detect HOW the stack is being used,
+        # not just WHAT is installed
+        if fp.framework in ("React", "Next.js"):
+            self._detect_react_patterns(fp, repo_path)
+
         return fp
+
+    def _detect_react_patterns(self, fp, repo_path: Path) -> None:
+        """Scan React/TS source files to detect coding patterns.
+
+        This goes beyond package.json -- we look at actual usage in source
+        files to generate rules like "use useQuery, never raw fetch in useEffect"
+        rather than generic advice.
+        """
+        tsx_files = [
+            p for p in repo_path.rglob("*.tsx")
+            if not self._should_skip(p, repo_path)
+            and "node_modules" not in p.parts
+        ]
+        ts_files = [
+            p for p in repo_path.rglob("*.ts")
+            if not self._should_skip(p, repo_path)
+            and "node_modules" not in p.parts
+            and not p.name.endswith(".d.ts")
+        ]
+        all_fe_files = tsx_files + ts_files
+
+        if not all_fe_files:
+            return
+
+        use_query_count = 0
+        fetch_in_effect_count = 0
+        cn_usage_count = 0
+        hook_files = []
+        custom_hook_imports: dict = {}
+
+        for file_path in all_fe_files[:150]:  # cap for performance
+            content = self._safe_read_file(file_path)
+            if not content:
+                continue
+
+            # useQuery / useMutation from tanstack -- means they use React Query
+            if re.search(r"\buseQuery\b|\buseMutation\b|\buseInfiniteQuery\b", content):
+                use_query_count += 1
+
+            # raw fetch inside useEffect -- anti-pattern in React Query codebases
+            if re.search(r"useEffect\s*\(", content) and re.search(r"\bfetch\s*\(", content):
+                fetch_in_effect_count += 1
+
+            # cn() utility for conditional class merging
+            if re.search(r"\bcn\s*\(", content):
+                cn_usage_count += 1
+
+            # custom hooks in hooks/ directory
+            if "hooks" in file_path.parts and file_path.name.startswith("use"):
+                hook_files.append(file_path.stem)
+
+            # track which custom hooks are imported across components
+            for match in re.finditer(r"import\s+\{([^}]+)\}\s+from\s+['\"].*?hooks/([^'\"]+)['\"]", content):
+                imports = [i.strip() for i in match.group(1).split(",")]
+                for imp in imports:
+                    if imp.startswith("use"):
+                        custom_hook_imports[imp] = custom_hook_imports.get(imp, 0) + 1
+
+        # set flags based on counts
+        if use_query_count >= 2:
+            fp.uses_react_query = True
+
+        # only flag fetch-in-effect as an anti-pattern if they also use React Query
+        # -- otherwise it might be intentional
+        if fetch_in_effect_count == 0 and use_query_count >= 2:
+            fp.avoids_fetch_in_effect = True
+
+        if cn_usage_count >= 3:
+            fp.uses_cn_utility = True
+
+        if hook_files:
+            fp.has_custom_hooks = True
+            # find the most-imported custom hook -- canonical example
+            if custom_hook_imports:
+                fp.canonical_data_hook = max(custom_hook_imports, key=custom_hook_imports.get)
+
+        # check for shared types file
+        for candidate in ["src/types.ts", "src/types/index.ts", "types.ts", "src/types/index.tsx"]:
+            if (repo_path / candidate).exists():
+                fp.shared_types_file = candidate
+                break
+        # also check frontend/ subdirectory for monorepos
+        if not fp.shared_types_file:
+            for candidate in ["frontend/src/types.ts", "frontend/src/types/index.ts"]:
+                if (repo_path / candidate).exists():
+                    fp.shared_types_file = candidate
+                    break
 
     def _extract_config_patterns(self, files: List[Path], repo_path: Path) -> ConfigPattern:
         pattern = ConfigPattern()
