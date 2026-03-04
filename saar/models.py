@@ -96,6 +96,20 @@ class TestPattern:
 
 
 @dataclass
+class FrontendPattern:
+    """Detected frontend stack patterns from package.json analysis."""
+    framework: Optional[str] = None          # next, react, vue, nuxt, svelte, astro
+    test_framework: Optional[str] = None     # vitest, jest, playwright, cypress
+    test_command: Optional[str] = None       # e.g. "bun run test", "npx vitest"
+    component_library: Optional[str] = None  # shadcn/ui, mui, chakra, antd
+    state_management: Optional[str] = None   # tanstack-query, zustand, redux
+    styling: Optional[str] = None           # tailwind, styled-components, emotion
+    package_manager: Optional[str] = None   # bun, pnpm, yarn, npm
+    build_tool: Optional[str] = None        # vite, webpack, turbopack
+    language: Optional[str] = None          # typescript, javascript
+
+
+@dataclass
 class ConfigPattern:
     """Detected configuration patterns."""
     env_loading: Optional[str] = None
@@ -117,6 +131,7 @@ class CodebaseDNA:
     logging_patterns: LoggingPattern = field(default_factory=LoggingPattern)
     naming_conventions: NamingConventions = field(default_factory=NamingConventions)
     test_patterns: TestPattern = field(default_factory=TestPattern)
+    frontend_patterns: Optional[FrontendPattern] = None
     config_patterns: ConfigPattern = field(default_factory=ConfigPattern)
     middleware_patterns: List[str] = field(default_factory=list)
     common_imports: List[str] = field(default_factory=list)

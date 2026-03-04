@@ -25,6 +25,34 @@ def render_claude_md(dna: CodebaseDNA) -> str:
             lines.append(f"Type hint coverage: {dna.type_hint_pct:.0f}%.")
         lines.append("")
 
+    # -- frontend stack --
+    fp = dna.frontend_patterns
+    if fp:
+        lines.append("\n## Frontend\n")
+        stack_parts = []
+        if fp.framework:
+            stack_parts.append(fp.framework)
+        if fp.language:
+            stack_parts.append(fp.language)
+        if fp.build_tool:
+            stack_parts.append(fp.build_tool)
+        if stack_parts:
+            lines.append(f"**Stack:** {' + '.join(stack_parts)}")
+        if fp.package_manager:
+            pm = fp.package_manager
+            lines.append(f"- Package manager: `{pm}` -- always use `{pm} install`, never npm/yarn")
+        if fp.component_library:
+            lines.append(f"- Component library: {fp.component_library} -- use over custom components")
+        if fp.state_management:
+            lines.append(f"- State management: {fp.state_management}")
+        if fp.styling:
+            lines.append(f"- Styling: {fp.styling} -- no raw CSS files")
+        if fp.test_framework:
+            test_line = f"- Frontend tests: {fp.test_framework}"
+            if fp.test_command:
+                test_line += f" (`{fp.test_command}`)"
+            lines.append(test_line)
+
     # -- coding conventions as imperative rules --
     lines.append("## Coding Conventions\n")
     nc = dna.naming_conventions

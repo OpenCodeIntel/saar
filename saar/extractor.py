@@ -692,6 +692,154 @@ class DNAExtractor:
 
         return pattern
 
+    def _extract_frontend_patterns(self, repo_path: Path) -> Optional["FrontendPattern"]:
+        """Detect frontend stack by reading package.json files.
+
+        Reads all package.json files found (handles monorepos with multiple
+        frontend packages). Returns None if no package.json found -- meaning
+        this is a pure backend/Python repo.
+        """
+        from saar.models import FrontendPattern
+        import json
+
+        pkg_files = [
+            p for p in repo_path.rglob("package.json")
+            if not self._should_skip(p, repo_path)
+            and "node_modules" not in p.parts
+        ]
+        if not pkg_files:
+            return None
+
+        # merge deps across all package.json files (monorepo support)
+        all_deps: dict = {}
+        all_dev_deps: dict = {}
+        all_scripts: dict = {}
+        for pkg_file in pkg_files:
+            try:
+                data = json.loads(pkg_file.read_text(encoding="utf-8"))
+                all_deps.update(data.get("dependencies", {}))
+                all_dev_deps.update(data.get("devDependencies", {}))
+                all_scripts.update(data.get("scripts", {}))
+            except Exception:
+                continue
+
+        combined = {**all_deps, **all_dev_deps}
+        if not combined:
+            return None
+
+        fp = FrontendPattern()
+
+        # -- package manager (check repo root AND subdirs for lockfiles) --
+        def _has_lockfile(name: str) -> bool:
+            # check root first, then any immediate subdirectory
+            if (repo_path / name).exists():
+                return True
+            return any(
+                (p / name).exists()
+                for p in repo_path.iterdir()
+                if p.is_dir() and not self._should_skip(p, repo_path)
+            )
+
+        if _has_lockfile("bun.lock") or _has_lockfile("bun.lockb"):
+            fp.package_manager = "bun"
+        elif _has_lockfile("pnpm-lock.yaml"):
+            fp.package_manager = "pnpm"
+        elif _has_lockfile("yarn.lock"):
+            fp.package_manager = "yarn"
+        else:
+            fp.package_manager = "npm"
+
+        # -- JS/TS language --
+        if "typescript" in combined or any(k.startswith("@types/") for k in combined):
+            fp.language = "TypeScript"
+        else:
+            fp.language = "JavaScript"
+
+        # -- UI framework (order matters -- Next before React) --
+        if "next" in combined:
+            fp.framework = "Next.js"
+        elif "nuxt" in combined or "nuxt3" in combined:
+            fp.framework = "Nuxt"
+        elif "@sveltejs/kit" in combined or "svelte" in combined:
+            fp.framework = "SvelteKit" if "@sveltejs/kit" in combined else "Svelte"
+        elif "astro" in combined:
+            fp.framework = "Astro"
+        elif "@angular/core" in combined:
+            fp.framework = "Angular"
+        elif "react" in combined or "react-dom" in combined:
+            fp.framework = "React"
+        elif "vue" in combined:
+            fp.framework = "Vue"
+
+        # -- build tool --
+        if "vite" in combined or "@vitejs/plugin-react" in combined:
+            fp.build_tool = "Vite"
+        elif "turbopack" in combined or ("next" in combined and "webpack" not in combined):
+            fp.build_tool = "Turbopack"
+        elif "webpack" in combined:
+            fp.build_tool = "webpack"
+
+        # -- test framework --
+        if "vitest" in combined:
+            fp.test_framework = "Vitest"
+            # find the test run command
+            test_cmd = all_scripts.get("test", "")
+            if "vitest" in test_cmd:
+                pm = fp.package_manager or "npm"
+                run = "run" if pm in ("bun", "npm", "yarn", "pnpm") else ""
+                fp.test_command = f"{pm} {run} test".strip()
+        elif "jest" in combined or "@jest/core" in combined:
+            fp.test_framework = "Jest"
+            fp.test_command = "jest"
+        elif "@playwright/test" in combined:
+            fp.test_framework = "Playwright"
+        elif "cypress" in combined:
+            fp.test_framework = "Cypress"
+        elif "mocha" in combined:
+            fp.test_framework = "Mocha"
+
+        # -- component library --
+        # shadcn/ui uses @radix-ui/* -- check for 3+ radix packages as signal
+        radix_count = sum(1 for k in combined if k.startswith("@radix-ui/"))
+        if radix_count >= 3:
+            fp.component_library = "shadcn/ui"
+        elif "@mui/material" in combined or "@material-ui/core" in combined:
+            fp.component_library = "Material UI"
+        elif "@chakra-ui/react" in combined:
+            fp.component_library = "Chakra UI"
+        elif "antd" in combined:
+            fp.component_library = "Ant Design"
+        elif "react-bootstrap" in combined:
+            fp.component_library = "React Bootstrap"
+        elif "@mantine/core" in combined:
+            fp.component_library = "Mantine"
+
+        # -- state management --
+        if "@tanstack/react-query" in combined or "react-query" in combined:
+            fp.state_management = "TanStack Query"
+        elif "zustand" in combined:
+            fp.state_management = "Zustand"
+        elif "@reduxjs/toolkit" in combined or "redux" in combined:
+            fp.state_management = "Redux Toolkit" if "@reduxjs/toolkit" in combined else "Redux"
+        elif "jotai" in combined:
+            fp.state_management = "Jotai"
+        elif "valtio" in combined:
+            fp.state_management = "Valtio"
+        elif "recoil" in combined:
+            fp.state_management = "Recoil"
+
+        # -- styling --
+        if "tailwindcss" in combined:
+            fp.styling = "Tailwind CSS"
+        elif "styled-components" in combined:
+            fp.styling = "styled-components"
+        elif "@emotion/react" in combined or "@emotion/styled" in combined:
+            fp.styling = "Emotion"
+        elif "sass" in combined or "node-sass" in combined:
+            fp.styling = "Sass/SCSS"
+
+        return fp
+
     def _extract_config_patterns(self, files: List[Path], repo_path: Path) -> ConfigPattern:
         pattern = ConfigPattern()
 
@@ -802,6 +950,7 @@ class DNAExtractor:
             router_pattern=router_pattern,
             team_rules=team_rules,
             team_rules_source=team_rules_source,
+            frontend_patterns=self._extract_frontend_patterns(path),
         )
 
         # Enrich with style analysis (AST-based, more precise than regex)
