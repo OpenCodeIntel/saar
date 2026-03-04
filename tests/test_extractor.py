@@ -325,3 +325,69 @@ export class UserRepository {
         dna = extractor.extract(str(tmp_path))
         assert dna is not None
         assert dna.language_distribution.get("python", 0) == 1
+
+
+class TestProjectStructure:
+
+    def test_generates_structure_for_nested_repo(self, tmp_path: Path):
+        """Project structure should be generated when meaningful dirs exist."""
+        (tmp_path / "backend" / "routes").mkdir(parents=True)
+        (tmp_path / "backend" / "routes" / "users.py").write_text("def get(): pass")
+        (tmp_path / "backend" / "services").mkdir(parents=True)
+        (tmp_path / "backend" / "services" / "auth.py").write_text("def login(): pass")
+        (tmp_path / "app.py").write_text("from fastapi import FastAPI")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.project_structure is not None
+        assert "routes/" in dna.project_structure
+        assert "services/" in dna.project_structure
+
+    def test_annotates_known_directories(self, tmp_path: Path):
+        """Known dir names (routes, services, hooks) get annotations."""
+        (tmp_path / "routes").mkdir()
+        (tmp_path / "routes" / "api.py").write_text("def r(): pass")
+        (tmp_path / "services").mkdir()
+        (tmp_path / "services" / "auth.py").write_text("def s(): pass")
+        (tmp_path / "middleware").mkdir()
+        (tmp_path / "middleware" / "auth.py").write_text("def m(): pass")
+        (tmp_path / "app.py").write_text("x = 1")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.project_structure is not None
+        assert "API endpoints" in dna.project_structure
+        assert "business logic" in dna.project_structure  # partial match works
+
+    def test_skips_empty_directories(self, tmp_path: Path):
+        """Dirs with no code files should not appear in structure."""
+        (tmp_path / "empty_dir").mkdir()
+        (tmp_path / "real" / "code").mkdir(parents=True)
+        (tmp_path / "real" / "code" / "app.py").write_text("x=1")
+        (tmp_path / "app.py").write_text("y=1")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        if dna.project_structure:
+            assert "empty_dir" not in dna.project_structure
+
+    def test_none_for_flat_repo(self, tmp_path: Path):
+        """Single flat directory shouldn't generate structure."""
+        (tmp_path / "app.py").write_text("def main(): pass\ndef run(): pass\n")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.project_structure is None
+
+    def test_structure_rendered_in_agents_md(self, tmp_path: Path):
+        from saar.formatters.agents_md import render_agents_md
+        from saar.models import CodebaseDNA
+
+        dna = CodebaseDNA(
+            repo_name="myapp",
+            project_structure="```\nmyapp/\n├── backend/  # FastAPI\n└── frontend/\n```"
+        )
+        out = render_agents_md(dna)
+        assert "## Project Structure" in out
+        assert "backend/" in out
+        assert "frontend/" in out

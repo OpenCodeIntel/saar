@@ -933,6 +933,116 @@ class DNAExtractor:
                     fp.shared_types_file = candidate
                     break
 
+    def _extract_project_structure(self, repo_path: Path) -> Optional[str]:
+        """Auto-generate an annotated directory tree for the project.
+
+        Only includes directories that contain actual source code (not config
+        files, not build artifacts). Annotates known patterns:
+        - routes/ → API endpoints
+        - services/ → business logic
+        - hooks/ → custom React hooks
+        - middleware/ → auth, rate limiting
+        etc.
+
+        Returns a code-block string ready to embed in AGENTS.md/CLAUDE.md,
+        or None if the structure is trivially flat (no meaningful subdirs).
+        """
+        # well-known directories and what they typically mean
+        _KNOWN_ANNOTATIONS = {
+            # backend
+            "routes": "API endpoints",
+            "services": "business logic / API clients",
+            "middleware": "auth, rate limiting, request processing",
+            "models": "data models / ORM schemas",
+            "schemas": "request/response schemas",
+            "config": "configuration, env validation",
+            "utils": "shared utilities",
+            "migrations": "database migrations",
+            "tests": "test files",
+            "tasks": "background jobs / celery tasks",
+            # frontend
+            "components": "UI components",
+            "hooks": "custom React hooks",
+            "pages": "route-level page components",
+            "contexts": "React context providers",
+            "lib": "shared utilities (cn, etc.)",
+            "types": "TypeScript type definitions",
+            "styles": "global styles",
+            "assets": "static assets",
+            # general
+            "test": "frontend tests",
+            # general
+            "docs": "documentation",
+            "scripts": "dev/deploy scripts",
+            "mcp-server": "MCP protocol server",
+        }
+
+        # directories to never include in the structure
+        _SKIP_STRUCTURE = self._active_skip_dirs | {
+            "public", "static", "media", "__pycache__", ".pytest_cache",
+            ".venv", ".git", ".idea", ".vscode", ".saar", ".claude",
+        }
+
+        def _count_code_files(d: Path) -> int:
+            """Count source files recursively in a directory."""
+            count = 0
+            try:
+                for p in d.rglob("*"):
+                    if p.is_file() and p.suffix in (
+                        ".py", ".ts", ".tsx", ".js", ".jsx"
+                    ) and not self._should_skip(p, repo_path):
+                        count += 1
+            except PermissionError:
+                pass
+            return count
+
+        def _build_tree(directory: Path, prefix: str = "", depth: int = 0) -> List[str]:
+            if depth > 3:
+                return []
+
+            lines = []
+            try:
+                children = sorted(
+                    [c for c in directory.iterdir() if c.is_dir()],
+                    key=lambda p: p.name
+                )
+            except PermissionError:
+                return []
+
+            visible = [
+                c for c in children
+                if c.name not in _SKIP_STRUCTURE
+                and not c.name.startswith(".")
+                and not any(skip in c.parts for skip in _SKIP_STRUCTURE)
+                and _count_code_files(c) > 0
+            ]
+
+            for i, child in enumerate(visible):
+                is_last = (i == len(visible) - 1)
+                connector = "└── " if is_last else "├── "
+                annotation = _KNOWN_ANNOTATIONS.get(child.name, "")
+                annotation_str = f"  # {annotation}" if annotation else ""
+                lines.append(f"{prefix}{connector}{child.name}/{annotation_str}")
+
+                # recurse one more level if it has meaningful subdirectories
+                sub_prefix = prefix + ("    " if is_last else "│   ")
+                sub_lines = _build_tree(child, sub_prefix, depth + 1)
+                lines.extend(sub_lines)
+
+            return lines
+
+        tree_lines = _build_tree(repo_path)
+
+        # not worth showing if fewer than 3 directories -- too flat
+        if len(tree_lines) < 3:
+            return None
+
+        result = "```\n"
+        result += f"{repo_path.name}/\n"
+        result += "\n".join(tree_lines)
+        result += "\n```"
+        return result
+
     def _extract_config_patterns(self, files: List[Path], repo_path: Path) -> ConfigPattern:
         pattern = ConfigPattern()
 
@@ -1044,6 +1154,7 @@ class DNAExtractor:
             team_rules=team_rules,
             team_rules_source=team_rules_source,
             frontend_patterns=self._extract_frontend_patterns(path),
+            project_structure=self._extract_project_structure(path),
         )
 
         # Enrich with style analysis (AST-based, more precise than regex)

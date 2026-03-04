@@ -169,6 +169,11 @@ def render_agents_md(dna: CodebaseDNA) -> str:
                 dep_note = f" ({d} dependents)" if d else ""
                 lines.append(f"- `{f}`{dep_note}")
 
+    # -- project structure --
+    if dna.project_structure:
+        lines.append("\n## Project Structure\n")
+        lines.append(dna.project_structure)
+
     # -- architecture --
     sp = dna.service_patterns
     ap = dna.auth_patterns

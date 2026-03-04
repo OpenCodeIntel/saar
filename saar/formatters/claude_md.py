@@ -104,6 +104,11 @@ def render_claude_md(dna: CodebaseDNA) -> str:
                 dep_note = f" ({d} dependents)" if d else ""
                 lines.append(f"- `{f}`{dep_note}")
 
+    # -- project structure --
+    if dna.project_structure:
+        lines.append("\n## Project Structure\n")
+        lines.append(dna.project_structure)
+
     # -- architecture rules --
     if dna.service_patterns.singleton_services or dna.auth_patterns.middleware_used:
         lines.append("\n## Architecture Rules\n")
