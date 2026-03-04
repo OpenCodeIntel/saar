@@ -61,8 +61,8 @@ class DNAExtractor:
         "dist", "build", "out", "target",
         # test/coverage artifacts
         "coverage", ".pytest_cache", "htmlcov", ".nyc_output",
-        # common data / cloned repo dirs that aren't project code
-        "repos", "data", "datasets", "tmp", "temp", "cache",
+        # cloned repo dirs (the specific OCI case)
+        "repos",
         # ide
         ".idea", ".vscode",
     }
