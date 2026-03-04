@@ -66,8 +66,19 @@ class DNAExtractor:
         # ide
         ".idea", ".vscode",
     }
+
+    # file suffixes that are never source code -- skip regardless of directory
+    SKIP_FILE_SUFFIXES = {
+        ".pyc", ".pyo", ".pyd",          # compiled python
+        ".DS_Store", ".Thumbs.db",        # OS junk
+        ".min.js", ".min.css",            # minified assets
+        ".map",                           # source maps
+        ".lock",                          # lockfiles (bun.lock, poetry.lock)
+        ".log",                           # log files
+    }
+
     MAX_FILE_SIZE = 1024 * 1024  # 1MB
-    MAX_FILES = 5000
+    MAX_FILES = 10000  # raised -- large monorepos can have many files after exclusions
 
     RULES_FILES = [
         "CLAUDE.md",
@@ -187,6 +198,8 @@ class DNAExtractor:
                     continue
                 if item.is_file() and item.suffix in extensions:
                     if self._should_skip(item, repo_path):
+                        continue
+                    if item.suffix in self.SKIP_FILE_SUFFIXES:
                         continue
                     total = len(app_files) + len(test_files)
                     if total >= self.MAX_FILES:

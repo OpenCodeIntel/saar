@@ -5,7 +5,12 @@
 Saar analyzes your codebase using tree-sitter AST parsing and auto-generates AI coding config files -- CLAUDE.md, .cursorrules, and copilot-instructions.md -- that actually reflect how your team writes code.
 
 ```bash
+# recommended (no venv needed)
+pipx install saar
+
+# or with pip
 pip install saar
+
 saar ./my-repo
 ```
 
@@ -82,10 +87,14 @@ Runs locally. Your code never leaves your machine. No API keys needed.
 ## Installation
 
 ```bash
+# recommended -- works on Mac/Linux without venv
+pipx install saar
+
+# or
 pip install saar
 ```
 
-Requires Python 3.10+.
+Requires Python 3.10+. On Mac, use `pipx` to avoid the externally-managed-environment error.
 
 ## Development
 
