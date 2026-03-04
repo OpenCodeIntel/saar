@@ -6,6 +6,7 @@ Anthropic's recommendation for CLAUDE.md files.
 """
 from saar.models import CodebaseDNA
 from saar.formatters._tribal import render_tribal_knowledge
+from saar.formatters.agents_md import _clean_team_rules
 
 
 def render_claude_md(dna: CodebaseDNA) -> str:
@@ -139,11 +140,13 @@ def render_claude_md(dna: CodebaseDNA) -> str:
     if tribal:
         lines.append(tribal)
 
-    # -- team rules (verbatim if they exist) --
+    # -- team rules (human-written sections only) --
     if dna.team_rules:
-        lines.append("\n## Team Rules\n")
-        if dna.team_rules_source:
-            lines.append(f"*Imported from `{dna.team_rules_source}`*\n")
-        lines.append(dna.team_rules)
+        cleaned = _clean_team_rules(dna.team_rules)
+        if cleaned:
+            lines.append("\n## Team Rules\n")
+            if dna.team_rules_source:
+                lines.append(f"*Imported from `{dna.team_rules_source}`*\n")
+            lines.append(cleaned)
 
     return "\n".join(lines) + "\n"
