@@ -30,7 +30,7 @@ jobs:
         run: ruff check saar/ tests/
 
       - name: Test
-        run: pytest tests/ -v --tb=short
+        run: pytest tests/ -v --tb=long 2>&1
 
   # Quick smoke test: install from built wheel and run CLI
   install-test:
@@ -55,4 +55,4 @@ jobs:
       - name: Smoke test CLI
         run: |
           saar --version
-          saar . --format markdown | head -20
+          saar extract . --format markdown --no-interview
