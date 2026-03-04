@@ -296,6 +296,11 @@ def extract(
         console.print("[red]Extraction failed. Use --verbose for details.[/red]")
         raise typer.Exit(code=1)
 
+    # -- show detection summary and ask for confirmation --
+    confirmed = _show_detection_summary(dna, console, no_interview)
+    if not confirmed:
+        raise typer.Exit(code=0)
+
     # -- guided interview -- captures tribal knowledge static analysis can't --
     from saar.interview import run_interview, save_cache
 
@@ -336,6 +341,134 @@ def extract(
             _write_with_markers(target, text, force=force, console=console)
 
     console.print("[bold green]done[/bold green]")
+
+
+def _show_detection_summary(dna, console, no_interview: bool) -> bool:
+    """Show what saar detected and ask for confirmation.
+
+    Returns True to proceed, False if user says detections are wrong.
+    Non-interactive (CI / --no-interview): always returns True, prints compact summary.
+
+    This is the trust-building step -- developers see exactly what saar
+    understood about their codebase before any file is written.
+    """
+    import sys
+    import os
+    from rich.table import Table
+
+    is_tty = sys.stdin.isatty() and sys.stdout.isatty()
+    ci = any(os.environ.get(v) for v in ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL"])
+    interactive = is_tty and not ci and not no_interview
+
+    console.print()
+
+    rows = []
+
+    # backend
+    backend_parts = []
+    if dna.detected_framework:
+        backend_parts.append(dna.detected_framework.title())
+    py_files = dna.language_distribution.get("python", 0)
+    if py_files:
+        backend_parts.append(f"Python ({py_files} files)")
+    if dna.database_patterns.orm_used:
+        backend_parts.append(dna.database_patterns.orm_used)
+    if dna.test_patterns.framework:
+        backend_parts.append(dna.test_patterns.framework)
+    if backend_parts:
+        rows.append(("Backend", "  ".join(backend_parts)))
+
+    # frontend
+    fp = dna.frontend_patterns
+    if fp:
+        fe_parts = []
+        if fp.framework:
+            fe_parts.append(fp.framework)
+        if fp.language:
+            fe_parts.append(fp.language)
+        if fp.build_tool:
+            fe_parts.append(fp.build_tool)
+        if fp.component_library:
+            fe_parts.append(fp.component_library)
+        if fp.state_management:
+            fe_parts.append(fp.state_management)
+        if fp.test_framework:
+            fe_parts.append(fp.test_framework)
+        if fe_parts:
+            rows.append(("Frontend", "  ".join(fe_parts)))
+        if fp.package_manager:
+            rows.append(("Package manager", fp.package_manager))
+
+    # scale
+    scale_parts = []
+    if dna.total_functions:
+        scale_parts.append(f"{dna.total_functions:,} functions")
+    total_files = sum(dna.language_distribution.values())
+    if total_files:
+        scale_parts.append(f"{total_files} files")
+    if dna.type_hint_pct:
+        scale_parts.append(f"{dna.type_hint_pct:.0f}% typed")
+    if scale_parts:
+        rows.append(("Scale", "  ".join(scale_parts)))
+
+    # auth patterns -- show actual decorator/middleware names, deduplicated
+    if dna.auth_patterns.middleware_used or dna.auth_patterns.auth_decorators:
+        auth_parts = []
+        seen = set()
+        for m in dna.auth_patterns.middleware_used[:2]:
+            if m not in seen:
+                auth_parts.append(m)
+                seen.add(m)
+        for d in dna.auth_patterns.auth_decorators[:3]:
+            # extract function name from Depends(fn) -> fn
+            name = d.split("(")[1].rstrip(")") if "(" in d else d
+            if name and name not in seen:
+                auth_parts.append(name)
+                seen.add(name)
+        if auth_parts:
+            rows.append(("Auth", "  ".join(auth_parts)))
+
+    # exception classes
+    if dna.error_patterns.exception_classes:
+        exc = ", ".join(dna.error_patterns.exception_classes[:4])
+        if len(dna.error_patterns.exception_classes) > 4:
+            exc += f" (+{len(dna.error_patterns.exception_classes) - 4} more)"
+        rows.append(("Exceptions", exc))
+
+    # team rules found
+    if dna.team_rules_source:
+        rows.append(("Team rules", f"found in {dna.team_rules_source}"))
+
+    # print the summary table
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="dim", width=18)
+    table.add_column()
+    for label, value in rows:
+        table.add_row(label, f"[cyan]{value}[/cyan]")
+
+    console.print(table)
+    console.print()
+
+    if not interactive:
+        return True
+
+    # ask for confirmation in interactive mode
+    try:
+        import questionary
+        confirmed = questionary.confirm("Does this look right?", default=True).ask()
+        if confirmed is None:
+            # Ctrl+C -- proceed anyway
+            return True
+        if not confirmed:
+            console.print(
+                "\n[dim]Use [bold]saar add \"correction here\"[/bold] to fix "
+                "anything saar got wrong, then re-run.[/dim]\n"
+            )
+            return False
+        console.print()
+        return True
+    except ImportError:
+        return True
 
 
 def _resolve_output_path(
