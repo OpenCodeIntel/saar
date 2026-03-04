@@ -160,10 +160,10 @@ def append_to_cache(repo_path: Path, field: str, value: str) -> InterviewAnswers
 
     if current:
         # normalize existing content to bullet list then append
-        lines = [l.strip() for l in current.strip().splitlines() if l.strip()]
-        cleaned = [l.lstrip("- ").lstrip("* ").strip() for l in lines]
+        raw_lines = [ln.strip() for ln in current.strip().splitlines() if ln.strip()]
+        cleaned = [ln.lstrip("- ").lstrip("* ").strip() for ln in raw_lines]
         cleaned.append(value.strip())
-        merged = "\n".join(f"- {l}" for l in cleaned)
+        merged = "\n".join(f"- {ln}" for ln in cleaned)
     else:
         merged = f"- {value.strip()}"
 

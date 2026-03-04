@@ -6,15 +6,13 @@ and graceful degradation when enrichment is unavailable.
 """
 import json
 from pathlib import Path
-from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from saar.enricher import enrich_answers, _build_raw_notes, _build_detected_stack
 from saar.models import (
-    CodebaseDNA, DatabasePattern, InterviewAnswers,
-    LoggingPattern, NamingConventions,
+    CodebaseDNA, InterviewAnswers,
 )
 
 

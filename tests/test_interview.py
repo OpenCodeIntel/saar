@@ -7,7 +7,7 @@ False in CI (no TTY). We test everything except the live prompt flow.
 import json
 import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -289,9 +289,9 @@ class TestAppendToCache:
         append_to_cache(tmp_path, "never_do", "Rule one")
         append_to_cache(tmp_path, "never_do", "Rule two")
         result = append_to_cache(tmp_path, "never_do", "Rule three")
-        lines = [l.strip() for l in result.never_do.splitlines() if l.strip()]
+        lines = [ln.strip() for ln in result.never_do.splitlines() if ln.strip()]
         assert len(lines) == 3
-        assert all(l.startswith("- ") for l in lines)
+        assert all(ln.startswith("- ") for ln in lines)
 
     def test_append_persists_to_disk(self, tmp_path: Path):
         from saar.interview import append_to_cache, load_cached

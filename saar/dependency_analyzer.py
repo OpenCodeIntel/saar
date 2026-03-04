@@ -8,7 +8,11 @@ import logging
 import re
 from collections import deque
 from pathlib import Path
-from typing import Set
+from typing import Dict, List, Optional, Set
+
+import tree_sitter_python as tspython
+import tree_sitter_javascript as tsjavascript
+from tree_sitter import Language, Parser
 
 
 def _path_should_skip(file_path: Path, repo_path: Path, skip: Set[str]) -> bool:
@@ -31,11 +35,7 @@ def _path_should_skip(file_path: Path, repo_path: Path, skip: Set[str]) -> bool:
             if s in parts:
                 return True
     return False
-from typing import Dict, List, Optional, Set
 
-import tree_sitter_python as tspython
-import tree_sitter_javascript as tsjavascript
-from tree_sitter import Language, Parser
 
 logger = logging.getLogger(__name__)
 

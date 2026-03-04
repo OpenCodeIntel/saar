@@ -134,7 +134,7 @@ def enrich(
 
     save_cache(repo_path, enriched)
     console.print("[bold green]done[/bold green] -- tribal knowledge enriched and saved.")
-    console.print(f"[dim]Re-run [bold]saar extract .[/bold] --no-interview to regenerate context files.[/dim]")
+    console.print("[dim]Re-run [bold]saar extract .[/bold] --no-interview to regenerate context files.[/dim]")
     pass
 
 
@@ -206,7 +206,7 @@ def add(
         field = "never_do"
         label = "Never do"
 
-    updated = append_to_cache(repo_path, field, correction)
+    append_to_cache(repo_path, field, correction)
     console.print(f"  [green]added[/green] [{label}] {correction}")
     console.print(
         f"  [dim]Saved to {repo_path / '.saar/config.json'}. "
