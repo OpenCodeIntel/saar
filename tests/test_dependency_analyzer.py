@@ -15,14 +15,15 @@ class TestDependencyAnalyzer:
     def test_finds_nodes(self, tmp_repo: Path):
         result = DependencyAnalyzer().build_graph(str(tmp_repo))
         file_ids = [n["id"] for n in result["nodes"]]
-        assert any("main.py" in f for f in file_ids)
+        assert any("main.py" in str(Path(f)) for f in file_ids)
 
     def test_resolves_internal_imports(self, tmp_repo: Path):
         result = DependencyAnalyzer().build_graph(str(tmp_repo))
         # dependencies.py imports from services/user_service.py
         edges = result["edges"]
         sources = [e["source"] for e in edges]
-        assert any("dependencies.py" in s for s in sources)
+        # use Path for cross-platform comparison
+        assert any(Path(s).name == "dependencies.py" for s in sources)
 
     def test_detects_circular_deps(self, tmp_path: Path):
         """Two files importing each other should be flagged."""

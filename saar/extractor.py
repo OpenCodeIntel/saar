@@ -90,11 +90,21 @@ class DNAExtractor:
     ]
 
     def __init__(self) -> None:
-        self.parsers = {
-            "python": Parser(Language(tspython.language())),
-            "javascript": Parser(Language(tsjavascript.language())),
-            "typescript": Parser(Language(tsjavascript.language())),
-        }
+        try:
+            self.parsers = {
+                "python": Parser(Language(tspython.language())),
+                "javascript": Parser(Language(tsjavascript.language())),
+                "typescript": Parser(Language(tsjavascript.language())),
+            }
+        except TypeError:
+            # tree-sitter <0.24 uses Parser().set_language() API
+            py_lang = Language(tspython.language())
+            js_lang = Language(tsjavascript.language())
+            self.parsers = {}
+            for name, lang in [("python", py_lang), ("javascript", js_lang), ("typescript", js_lang)]:
+                p = Parser()
+                p.language = lang
+                self.parsers[name] = p
         self._file_cache: Dict[Path, str] = {}
         self._stats = {"files_read": 0, "files_skipped": 0, "read_errors": 0}
         self._active_skip_dirs = set(self.SKIP_DIRS)

@@ -49,11 +49,20 @@ class DependencyAnalyzer:
     }
 
     def __init__(self) -> None:
-        self.parsers = {
-            "python": Parser(Language(tspython.language())),
-            "javascript": Parser(Language(tsjavascript.language())),
-            "typescript": Parser(Language(tsjavascript.language())),
-        }
+        try:
+            self.parsers = {
+                "python": Parser(Language(tspython.language())),
+                "javascript": Parser(Language(tsjavascript.language())),
+                "typescript": Parser(Language(tsjavascript.language())),
+            }
+        except TypeError:
+            py_lang = Language(tspython.language())
+            js_lang = Language(tsjavascript.language())
+            self.parsers = {}
+            for name, lang in [("python", py_lang), ("javascript", js_lang), ("typescript", js_lang)]:
+                p = Parser()
+                p.language = lang
+                self.parsers[name] = p
 
     def _detect_language(self, file_path: str) -> str:
         ext = Path(file_path).suffix.lower()
