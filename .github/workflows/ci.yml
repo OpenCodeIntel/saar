@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
+      - name: Show tree-sitter version
+        run: pip show tree-sitter tree-sitter-python tree-sitter-javascript
+
       - name: Lint
         run: ruff check saar/ tests/
 

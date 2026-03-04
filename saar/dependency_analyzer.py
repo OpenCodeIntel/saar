@@ -202,7 +202,8 @@ class DependencyAnalyzer:
         all_imports: Set[str] = set()
 
         for fp in code_files:
-            rel = str(fp.relative_to(path))
+            # always use forward slashes for internal keys -- Windows compat
+            rel = fp.relative_to(path).as_posix()
             analysis = self.analyze_file(str(fp))
             file_deps[rel] = analysis["imports"]
             all_imports.update(analysis["imports"])
