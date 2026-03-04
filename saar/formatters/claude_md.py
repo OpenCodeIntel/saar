@@ -166,6 +166,12 @@ def render_claude_md(dna: CodebaseDNA) -> str:
             lines.append("- Shared fixtures live in `conftest.py`")
         lines.append("- Run: `pytest tests/ -v`")
 
+    # -- verification workflow --
+    if dna.verify_workflow:
+        lines.append("\n## Verification Workflow\n")
+        lines.append(f"{dna.verify_workflow}")
+        lines.append("\nRun these before considering any change done.")
+
     # -- API patterns --
     if dna.api_versioning or dna.router_pattern:
         lines.append("\n## API Patterns\n")

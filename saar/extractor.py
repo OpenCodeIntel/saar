@@ -933,6 +933,127 @@ class DNAExtractor:
                     fp.shared_types_file = candidate
                     break
 
+    def _extract_verify_workflow(self, repo_path: Path) -> Optional[str]:
+        """Auto-detect how developers verify their changes work.
+
+        Reads from multiple sources in priority order:
+        1. package.json scripts (test, typecheck, lint, build)
+        2. pyproject.toml / pytest config
+        3. Makefile targets (test, lint, check)
+        4. CI workflow files (.github/workflows/)
+
+        Returns a concise workflow string like:
+        "Backend: pytest tests/ -v | Frontend: bun run test && bun run typecheck"
+        """
+        import json as _json
+
+        steps: list[str] = []
+
+        # --- Python / backend ---
+        py_test_cmd = None
+
+        # pyproject.toml
+        pyproject = repo_path / "pyproject.toml"
+        if not pyproject.exists():
+            pyproject = repo_path / "backend" / "pyproject.toml"
+        if pyproject.exists():
+            content = self._safe_read_file(pyproject)
+            if content and "pytest" in content:
+                m = re.search(r'testpaths\s*=\s*\[([^\]]+)\]', content)
+                if m:
+                    paths = m.group(1).replace('"', '').replace("'", '').replace(',', '').split()
+                    py_test_cmd = f"pytest {' '.join(paths)} -v"
+                else:
+                    py_test_cmd = "pytest tests/ -v"
+
+        # pytest.ini / setup.cfg as fallback
+        if not py_test_cmd:
+            for cfg in [
+                repo_path / "pytest.ini",
+                repo_path / "backend" / "pytest.ini",
+                repo_path / "setup.cfg",
+                repo_path / "backend" / "setup.cfg",
+            ]:
+                if cfg.exists():
+                    content = self._safe_read_file(cfg)
+                    if content and ("pytest" in content or "[tool:pytest]" in content):
+                        # check for testpaths
+                        m = re.search(r'testpaths\s*=\s*(.+)', content)
+                        if m:
+                            paths = m.group(1).strip().split()
+                            py_test_cmd = f"pytest {' '.join(paths[:2])} -v"
+                        else:
+                            py_test_cmd = "pytest tests/ -v"
+                        break
+
+        # requirements.txt with pytest = likely a Python project
+        if not py_test_cmd:
+            for req in [repo_path / "requirements.txt", repo_path / "backend" / "requirements.txt"]:
+                if req.exists():
+                    content = self._safe_read_file(req)
+                    if content and "pytest" in content:
+                        py_test_cmd = "pytest tests/ -v"
+                        break
+
+        if py_test_cmd:
+            steps.append(f"Backend: `{py_test_cmd}`")
+
+        # --- JavaScript / TypeScript frontend ---
+        js_steps: list[str] = []
+        pkg_files = [
+            p for p in repo_path.rglob("package.json")
+            if not self._should_skip(p, repo_path)
+            and "node_modules" not in p.parts
+        ]
+        for pkg_file in pkg_files:
+            try:
+                data = _json.loads(pkg_file.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+
+            scripts = data.get("scripts", {})
+            pm = "bun"
+            lockfile_parent = pkg_file.parent
+            if (lockfile_parent / "bun.lock").exists() or (lockfile_parent / "bun.lockb").exists():
+                pm = "bun"
+            elif (lockfile_parent / "pnpm-lock.yaml").exists():
+                pm = "pnpm"
+            elif (lockfile_parent / "yarn.lock").exists():
+                pm = "yarn"
+            else:
+                pm = "npm"
+
+            # priority order: typecheck > test > lint > build
+            for key in ("typecheck", "type-check", "test", "lint", "build"):
+                if key in scripts and scripts[key]:
+                    cmd = f"{pm} run {key}"
+                    if cmd not in js_steps:
+                        js_steps.append(cmd)
+                    if len(js_steps) >= 3:
+                        break
+
+        if js_steps:
+            steps.append(f"Frontend: `{'` then `'.join(js_steps)}`")
+
+        # --- Makefile ---
+        makefile = repo_path / "Makefile"
+        if makefile.exists():
+            content = self._safe_read_file(makefile)
+            if content:
+                # find phony test/check/lint targets
+                make_targets = []
+                for target in ("test", "check", "lint", "validate"):
+                    # target exists as a make rule
+                    if re.search(rf"^{target}[:\s]", content, re.MULTILINE):
+                        make_targets.append(f"make {target}")
+                if make_targets and not any("pytest" in s or "bun" in s for s in steps):
+                    steps.append(f"Run: `{'` + `'.join(make_targets[:2])}`")
+
+        if not steps:
+            return None
+
+        return " | ".join(steps)
+
     def _extract_project_structure(self, repo_path: Path) -> Optional[str]:
         """Auto-generate an annotated directory tree for the project.
 
@@ -1155,6 +1276,7 @@ class DNAExtractor:
             team_rules_source=team_rules_source,
             frontend_patterns=self._extract_frontend_patterns(path),
             project_structure=self._extract_project_structure(path),
+            verify_workflow=self._extract_verify_workflow(path),
         )
 
         # Enrich with style analysis (AST-based, more precise than regex)

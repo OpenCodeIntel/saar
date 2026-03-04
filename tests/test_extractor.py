@@ -391,3 +391,65 @@ class TestProjectStructure:
         assert "## Project Structure" in out
         assert "backend/" in out
         assert "frontend/" in out
+
+
+class TestVerifyWorkflow:
+
+    def test_detects_pytest_from_pyproject(self, tmp_path: Path):
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.pytest.ini_options]\ntestpaths = [\"tests\"]\n"
+        )
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "tests" / "test_app.py").write_text("def test_x(): pass")
+        (tmp_path / "app.py").write_text("def main(): pass")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.verify_workflow is not None
+        assert "pytest" in dna.verify_workflow
+
+    def test_detects_pytest_from_requirements(self, tmp_path: Path):
+        (tmp_path / "requirements.txt").write_text("pytest>=8.0\nfastapi\n")
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "tests" / "test_app.py").write_text("def test_x(): pass")
+        (tmp_path / "app.py").write_text("def main(): pass")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.verify_workflow is not None
+        assert "pytest" in dna.verify_workflow
+
+    def test_detects_bun_scripts(self, tmp_path: Path):
+        import json
+        (tmp_path / "package.json").write_text(json.dumps({
+            "scripts": {"test": "vitest run", "typecheck": "tsc --noEmit", "lint": "eslint ."},
+            "devDependencies": {"vitest": "^1", "typescript": "^5"}
+        }))
+        (tmp_path / "bun.lock").write_text("")
+        (tmp_path / "app.ts").write_text("const x = 1;")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.verify_workflow is not None
+        assert "bun" in dna.verify_workflow
+        assert "typecheck" in dna.verify_workflow
+
+    def test_none_for_no_test_config(self, tmp_path: Path):
+        (tmp_path / "app.py").write_text("def main(): pass\n" * 5)
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.verify_workflow is None
+
+    def test_rendered_in_agents_md(self):
+        from saar.formatters.agents_md import render_agents_md
+        from saar.models import CodebaseDNA
+
+        dna = CodebaseDNA(
+            repo_name="test",
+            verify_workflow="Backend: `pytest tests/ -v` | Frontend: `bun run test`"
+        )
+        out = render_agents_md(dna)
+        assert "How to Verify Changes Work" in out
+        assert "pytest" in out
+        assert "bun run test" in out

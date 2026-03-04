@@ -149,6 +149,8 @@ class CodebaseDNA:
     team_rules_source: Optional[str] = None
     # project structure -- auto-generated directory tree with annotations
     project_structure: Optional[str] = None
+    # verify workflow -- auto-detected commands to verify changes work
+    verify_workflow: Optional[str] = None
     # interview -- tribal knowledge from guided questions
     interview: Optional[InterviewAnswers] = None
     # style analysis enrichments

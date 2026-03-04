@@ -230,6 +230,12 @@ def render_agents_md(dna: CodebaseDNA) -> str:
         if tp.has_conftest:
             lines.append("- Shared fixtures in `conftest.py`")
 
+    # -- verification workflow --
+    if dna.verify_workflow:
+        lines.append("\n## How to Verify Changes Work\n")
+        lines.append(f"{dna.verify_workflow}")
+        lines.append("\nRun these before considering any change done.")
+
     # -- API --
     if dna.api_versioning or dna.router_pattern:
         lines.append("\n## API\n")

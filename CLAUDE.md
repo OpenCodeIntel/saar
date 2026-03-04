@@ -1,7 +1,7 @@
 <!-- SAAR:AUTO-START -->
 # CLAUDE.md -- saar
 
-297 functions, 49 classes.
+303 functions, 50 classes.
 Async adoption: 20%.
 Type hint coverage: 92%.
 
@@ -64,6 +64,12 @@ saar/
 - Mock with: unittest.mock
 - Shared fixtures live in `conftest.py`
 - Run: `pytest tests/ -v`
+
+## Verification Workflow
+
+Backend: `pytest tests -v`
+
+Run these before considering any change done.
 
 ## Tribal Knowledge
 
