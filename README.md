@@ -1,100 +1,259 @@
-# Saar
+# saar
 
-**Extract the essence of your codebase.**
-
-Saar analyzes your codebase using tree-sitter AST parsing and auto-generates AI coding config files -- CLAUDE.md, .cursorrules, and copilot-instructions.md -- that actually reflect how your team writes code.
+Extract the essence of your codebase. Auto-generate AI context files that actually reflect how your team writes code.
 
 ```bash
-# recommended (no venv needed)
 pipx install saar
-
-# or with pip
-pip install saar
-
-saar ./my-repo
+saar extract ./my-repo
 ```
 
-## Why
+---
 
-AI coding tools generate code that doesn't match your project's conventions. The fix is config files like CLAUDE.md and .cursorrules, but nobody writes them well and nobody keeps them updated.
+## The problem
 
-Saar does it automatically. Deep static analysis, not keyword matching. It parses your AST and detects auth patterns, service architecture, database conventions, error handling, naming rules, dependency structure, and more.
+AI coding tools know everything about every codebase except yours.
 
-## Real output
+They write `npm install` in your bun repo. They invent exception classes you already have. They touch frozen modules. Every session starts from zero -- no memory of your conventions, your gotchas, your patterns. You spend the session correcting the same mistakes.
 
-Running `saar` on a FastAPI backend (82 Python files):
+The fix is a context file (CLAUDE.md, AGENTS.md, .cursorrules) that tells your AI assistant how your specific codebase works. But nobody writes these well. You forget the exception class buried in auth.py. You forget the service singleton pattern. You forget the rule you added six months ago. The file goes stale the week after you write it.
 
-```
-Framework: fastapi
+Saar generates it automatically, keeps it updated, and lets you accumulate corrections over time.
 
-Functions: 787 | Classes: 175
-Async Adoption: 49%
-Type Hint Coverage: 88%
-Internal Dependencies: 199
-
-Authentication: Depends(require_auth), Depends(public_auth)
-Service Layer: 7 singletons wired via dependencies.py
-Database: Supabase, UUID primary keys, TIMESTAMPTZ, RLS enabled
-Testing: pytest with fixtures, unittest.mock
-Config: python-dotenv, Pydantic Settings
-```
-
-Running on a Next.js app (22 TypeScript files):
-
-```
-Framework: nextjs
-
-Functions: 12 | Classes: 0
-Async Adoption: 28%
-Type Hint Coverage: 64%
-Internal Dependencies: 5
-```
-
-## What it detects
-
-**Three analysis engines, all tree-sitter powered:**
-
-- **DNA Extractor** -- auth patterns, service architecture, database conventions, error handling, logging, naming, config, API patterns, team rules detection
-- **Style Analyzer** -- function/class counts, async adoption %, type hint coverage %, naming convention distribution, top imports
-- **Dependency Analyzer** -- import graph, internal dependency resolution, circular dependency detection, critical files (most dependents), impact analysis
-
-## Output formats
-
-```bash
-saar ./my-repo                          # markdown to stdout
-saar ./my-repo --format claude          # generate CLAUDE.md
-saar ./my-repo --format cursorrules     # generate .cursorrules
-saar ./my-repo --format copilot         # generate copilot-instructions.md
-saar ./my-repo --format all             # generate all three
-saar ./my-repo -o ./output/             # write to directory
-saar ./my-repo --format claude --force  # overwrite existing files
-saar ./my-repo --exclude vendor data    # skip directories
-```
-
-## Smart defaults
-
-- Auto-reads `.gitignore` to skip irrelevant directories
-- Separates test code from application code (prevents false positives from test fixtures)
-- Won't overwrite existing config files without `--force`
-- Skips its own output files when reading team rules (no inception loop)
+---
 
 ## How it works
 
-Saar uses tree-sitter to parse every Python and JavaScript/TypeScript file into an AST. It walks the syntax tree to extract structural patterns -- not regex on raw text, not LLM inference. Zero hallucination because it reads the actual code structure.
+```
+saar extract ./my-repo
+```
 
-Runs locally. Your code never leaves your machine. No API keys needed.
+Three things happen:
+
+1. **Static analysis** -- tree-sitter AST parsing across every Python and TypeScript/JavaScript file. Detects auth patterns, service architecture, exception classes, database conventions, naming conventions, dependency graph, critical files.
+
+2. **Guided interview** -- 4-7 questions that capture what static analysis cannot. Domain vocabulary, gotchas, off-limits files, verification workflow. Answers cached in `.saar/config.json`, never asked again.
+
+3. **AGENTS.md generated** -- cross-tool standard read by Claude Code, Cursor, Copilot, Codex, Gemini CLI. Also generates CLAUDE.md, .cursorrules, copilot-instructions.md on request.
+
+Runs locally. Your code never leaves your machine. No API keys required.
+
+---
+
+## Real output
+
+Running on our own codebase (saar itself):
+
+```
+saar analyzing saar...
+Found 24 code files (15 app, 9 test)
+Style: 252 functions, 38 classes, 21% async, 92% typed
+Graph built: 24 nodes, 46 edges, 0 cycles
+DNA extraction complete: 0.75s
+```
+
+Generated AGENTS.md (auto-detected section):
+
+```markdown
+252 functions, 38 classes, 21% async, 92% type-hinted.
+Languages: python (24 files)
+
+## Coding Conventions
+- Functions: snake_case
+- Classes: PascalCase
+- Constants: UPPER_SNAKE_CASE
+
+## Critical Files
+- saar/models.py (14 dependents)
+- saar/interview.py (3 dependents)
+- saar/cli.py (3 dependents)
+
+## Testing
+- Framework: pytest
+- Pattern: test_*.py
+- Shared fixtures in conftest.py
+```
+
+Plus tribal knowledge from the interview:
+
+```markdown
+## Tribal Knowledge
+
+This project: CLI tool that extracts codebase DNA and generates AI context files
+
+### Never Do
+- Never add external infrastructure dependencies (no network calls)
+- Never use print() -- always use logging
+
+### Domain Vocabulary
+- DNA = extracted architectural patterns of a codebase
+- Tribal knowledge = context only humans can provide
+
+### Off-Limits Files
+- saar/models.py -- core data contract, discuss before changing
+```
+
+---
+
+## Accumulating corrections
+
+The highest-value content in any context file is the corrections -- things AI got wrong, rules discovered the hard way. Saar has a command for this:
+
+```bash
+# AI just tried to use npm in your bun repo
+saar add "Never use npm -- this project uses bun only"
+
+# Claude modified a frozen module
+saar add --off-limits "billing/ -- legacy Stripe integration, frozen until Q3"
+
+# AI used generic exceptions instead of your domain ones
+saar add --domain "AuthenticationError -- use this, not HTTPException, for auth failures"
+
+# Re-generate with the new rule
+saar extract . --no-interview
+```
+
+Each correction is appended as a bullet to your tribal knowledge. Every subsequent generation includes it. The file gets better every time AI makes a mistake.
+
+---
+
+## AI enrichment
+
+Raw corrections get polished into precise, actionable rules:
+
+```bash
+# Set ANTHROPIC_API_KEY, then:
+saar enrich
+```
+
+Turns `"don't touch billing it's messy"` into:
+
+```
+NEVER modify billing/ -- legacy Stripe integration, no test coverage,
+frozen until Q3 migration. Changes require DBA review.
+```
+
+Or run enrichment inline:
+
+```bash
+saar extract . --enrich
+```
+
+---
+
+## All commands
+
+```bash
+# generate AGENTS.md (default -- cross-tool standard)
+saar extract ./my-repo
+
+# generate specific formats
+saar extract ./my-repo --format claude          # CLAUDE.md
+saar extract ./my-repo --format cursorrules     # .cursorrules
+saar extract ./my-repo --format copilot         # copilot-instructions.md
+saar extract ./my-repo --format all             # all four
+
+# skip the interview (use cached answers or auto-detect only)
+saar extract ./my-repo --no-interview
+
+# add a correction without re-running analysis
+saar add "Never use sync functions in async endpoints"
+saar add --domain "Workspace = tenant, not a directory"
+saar add --off-limits "core/auth.py -- clock-skew workaround"
+saar add --verify "pytest -x && docker compose up && curl localhost:8000/health"
+
+# AI enrichment of raw answers via Claude
+saar enrich
+saar enrich --dry-run          # preview without saving
+saar extract . --enrich        # enrich inline during extraction
+
+# write to a specific directory
+saar extract ./my-repo -o ./docs/
+
+# overwrite existing files
+saar extract ./my-repo --force
+
+# exclude directories beyond defaults
+saar extract ./my-repo --exclude vendor legacy
+```
+
+---
+
+## Preservation markers
+
+Generated files include markers that separate auto-detected content from anything you write manually:
+
+```markdown
+<!-- SAAR:AUTO-START -->
+[auto-detected content -- updated on every re-run]
+<!-- SAAR:AUTO-END -->
+
+[your manual additions -- never touched]
+```
+
+Re-running `saar extract` updates the auto section and leaves everything below the markers untouched. Add team-specific rules below the end marker -- they persist forever.
+
+---
+
+## Custom exclusions
+
+Create `.saarignore` in your repo root using the same syntax as `.gitignore`:
+
+```
+# .saarignore
+vendor/
+legacy/
+generated/
+backend/repos/
+```
+
+Saar already skips `node_modules/`, `venv/`, `dist/`, `build/`, `.git/`, and everything in `.gitignore`. `.saarignore` adds project-specific exclusions on top.
+
+---
+
+## What it detects
+
+**From Python files:**
+- Framework (FastAPI, Flask, Django)
+- Auth patterns -- middleware, decorators, auth context type
+- Service architecture -- singletons, dependency injection, wiring file
+- Database -- ORM, primary key type, timestamps, Row Level Security, cascade deletes
+- Error handling -- exception class hierarchy, HTTP exception usage, logging on error
+- Logging -- logger import pattern, structured logging
+- Config -- env loading, settings pattern, secrets handling
+- Naming conventions -- function/class/constant/file style
+
+**From TypeScript/JavaScript files:**
+- Framework (Next.js, Express, React)
+- Function counting -- arrow functions, methods, declarations
+- Naming conventions -- camelCase vs PascalCase detection
+- Common imports -- top patterns across the codebase
+
+**From the dependency graph:**
+- Import resolution -- which files import which
+- Critical files -- highest dependent count (understand before editing)
+- Circular dependencies -- flagged explicitly
+- Impact analysis -- what breaks if you change a file
+
+**From team rules files:**
+- Auto-includes CLAUDE.md, .cursorrules, .codeintel/rules.md, CONVENTIONS.md, copilot-instructions.md
+
+---
 
 ## Installation
 
 ```bash
-# recommended -- works on Mac/Linux without venv
+# recommended -- no venv needed
 pipx install saar
 
 # or
 pip install saar
 ```
 
-Requires Python 3.10+. On Mac, use `pipx` to avoid the externally-managed-environment error.
+Requires Python 3.10+.
+
+On Mac, use `pipx` to avoid the `externally-managed-environment` error.
+
+---
 
 ## Development
 
@@ -103,10 +262,20 @@ git clone https://github.com/OpenCodeIntel/saar.git
 cd saar
 python -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
-pytest tests/ -v           # 75 tests
-ruff check saar/ tests/    # lint
+pytest tests/ -v
+ruff check saar/ tests/
 ```
+
+AI enrichment requires `anthropic`:
+
+```bash
+pip install saar[enrich]
+export ANTHROPIC_API_KEY=your-key
+saar enrich
+```
+
+---
 
 ## License
 
-MIT
+MIT. Built by [OpenCodeIntel](https://opencodeintel.com).

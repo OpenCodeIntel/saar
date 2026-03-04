@@ -1,0 +1,28 @@
+<!-- SAAR:AUTO-START -->
+# Project: saar
+
+## Style Rules
+
+- Name functions in snake_case
+- Name classes in PascalCase
+- Name files in snake_case
+
+## Testing
+
+- Framework: pytest
+- Pattern: test_*.py
+- Mocking: unittest.mock
+
+## Common Imports
+
+- import logging
+- from saar.models import CodebaseDNA
+- from pathlib import Path
+- from typing import Optional
+- import re
+- import tree_sitter_python as tspython
+- import tree_sitter_javascript as tsjavascript
+- from tree_sitter import Language, Parser
+- import json
+- import os
+<!-- SAAR:AUTO-END -->
