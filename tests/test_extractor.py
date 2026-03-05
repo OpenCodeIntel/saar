@@ -453,3 +453,108 @@ class TestVerifyWorkflow:
         assert "How to Verify Changes Work" in out
         assert "pytest" in out
         assert "bun run test" in out
+
+
+class TestExpandedORMDetection:
+
+    def test_detects_django_autofid(self, tmp_path: Path):
+        (tmp_path / "models.py").write_text(
+            "from django.db import models\n"
+            "class Post(models.Model):\n"
+            "    id = models.AutoField(primary_key=True)\n"
+            "    created = models.DateTimeField(auto_now_add=True)\n"
+        )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.database_patterns.orm_used == "Django ORM"
+        assert "AutoField" in dna.database_patterns.id_type
+        assert "DateTimeField" in dna.database_patterns.timestamp_type
+
+    def test_detects_tortoise_orm(self, tmp_path: Path):
+        (tmp_path / "models.py").write_text(
+            "from tortoise.models import Model\n"
+            "from tortoise import fields\n"
+            "class User(Model):\n"
+            "    id = fields.IntField(pk=True)\n"
+        )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.database_patterns.orm_used == "Tortoise ORM"
+
+    def test_detects_sqlalchemy_datetime(self, tmp_path: Path):
+        (tmp_path / "db.py").write_text(
+            "from sqlalchemy import create_engine, DateTime, UUID\n"
+            "engine = create_engine('postgresql://localhost/mydb')\n"
+        )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.database_patterns.orm_used == "SQLAlchemy"
+        assert "DateTime" in dna.database_patterns.timestamp_type
+        assert "UUID" in dna.database_patterns.id_type
+        assert "create_engine" in dna.database_patterns.connection_pattern
+
+    def test_detects_supabase_connection_pattern(self, tmp_path: Path):
+        (tmp_path / "supabase_service.py").write_text(
+            "from supabase import create_client\n"
+            "_client = None\n"
+            "def get_supabase_service():\n"
+            "    global _client\n"
+            "    if not _client:\n"
+            "        _client = create_client(URL, KEY)\n"
+            "    return _client\n"
+        )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.database_patterns.orm_used == "Supabase"
+        assert "get_supabase_service" in dna.database_patterns.connection_pattern
+
+    def test_detects_motor_mongodb(self, tmp_path: Path):
+        (tmp_path / "db.py").write_text(
+            "import motor.motor_asyncio\n"
+            "from motor import motor_asyncio\n"
+            "client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URL)\n"
+        )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert dna.database_patterns.orm_used == "Motor (async MongoDB)"
+
+
+class TestExpandedAuthDetection:
+
+    def test_detects_django_permission_required(self, tmp_path: Path):
+        (tmp_path / "views.py").write_text(
+            "from django.contrib.auth.decorators import permission_required, login_required\n"
+            "@permission_required('myapp.can_edit')\n"
+            "def edit_view(request): pass\n"
+        )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert "@permission_required" in dna.auth_patterns.auth_decorators
+
+    def test_detects_nestjs_guards(self, tmp_path: Path):
+        (tmp_path / "auth.controller.ts").write_text(
+            "import { Controller, UseGuards } from '@nestjs/common';\n"
+            "import { JwtAuthGuard } from './jwt-auth.guard';\n"
+            "@Controller('auth')\n"
+            "@UseGuards(JwtAuthGuard)\n"
+            "export class AuthController {}\n"
+        )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert "JwtAuthGuard" in dna.auth_patterns.middleware_used or \
+               any("JwtAuthGuard" in d for d in dna.auth_patterns.auth_decorators)
+
+    def test_django_databases_connection_pattern(self, tmp_path: Path):
+        (tmp_path / "settings.py").write_text(
+            "from django.conf import settings\n"
+            "DATABASES = {\n"
+            "    'default': {'ENGINE': 'django.db.backends.postgresql'}\n"
+            "}\n"
+        )
+        (tmp_path / "models.py").write_text(
+            "from django.db import models\n"
+            "class User(models.Model): pass\n"
+        )
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path))
+        assert "Django DATABASES" in dna.database_patterns.connection_pattern

@@ -381,12 +381,34 @@ class DNAExtractor:
             if re.search(r"^from django", content, re.MULTILINE):
                 if "@login_required" in content:
                     pattern.auth_decorators.append("@login_required")
+                if "permission_required" in content:
+                    pattern.auth_decorators.append("@permission_required")
                 if "request.user" in content:
                     pattern.auth_context_type = "request.user"
+                if "IsAuthenticated" in content:
+                    pattern.auth_decorators.append("IsAuthenticated")
 
             # Ownership
             if re.search(r"^def verify_ownership\b", content, re.MULTILINE):
                 pattern.ownership_checks.append("verify_ownership")
+
+        # NestJS auth -- TypeScript files, separate pass
+        for file_path in files:
+            if file_path.suffix not in (".ts", ".tsx"):
+                continue
+            content = self._safe_read_file(file_path)
+            if not content:
+                continue
+            if not re.search(r"from '@nestjs/", content):
+                continue
+            if "@UseGuards(" in content:
+                guards = re.findall(r"@UseGuards\((\w+)\)", content)
+                for g in guards:
+                    pattern.auth_decorators.append(f"@UseGuards({g})")
+            if "JwtAuthGuard" in content:
+                pattern.middleware_used.append("JwtAuthGuard")
+            if "@Public()" in content:
+                pattern.auth_decorators.append("@Public()")
 
         pattern.middleware_used = list(set(pattern.middleware_used))
         pattern.auth_decorators = list(set(pattern.auth_decorators))
@@ -410,6 +432,18 @@ class DNAExtractor:
                 patterns.append("app.add_middleware()")
             if "app.use(" in content:
                 patterns.append("app.use(middleware)")
+
+            # Django middleware in settings
+            if "MIDDLEWARE" in content and "django" in content.lower():
+                mw_matches = re.findall(r"['\"][\w.]*Middleware[\w.]*['\"]", content)
+                for mw in mw_matches[:3]:
+                    patterns.append(mw.strip("'\"").split(".")[-1])
+
+            # NestJS interceptors / guards as middleware
+            if re.search(r"^import.*from '@nestjs/", content, re.MULTILINE):
+                if "NestFactory" in content and "app.use(" in content:
+                    mw = re.findall(r"app\.use\((\w+)", content)
+                    patterns.extend(mw[:3])
 
         return list(set(patterns))
 
@@ -467,19 +501,67 @@ class DNAExtractor:
 
             # ORM detection -- line-start anchored to avoid matching string literals
             if re.search(r"^from supabase\b|^import supabase\b", content, re.MULTILINE):
-                pattern.orm_used = "Supabase"
+                if not pattern.orm_used:
+                    pattern.orm_used = "Supabase"
+                # detect connection pattern
+                if "get_supabase_service()" in content:
+                    pattern.connection_pattern = "Singleton: get_supabase_service()"
+                elif "create_client(" in content and not pattern.connection_pattern:
+                    pattern.connection_pattern = "Direct: create_client()"
+
             if re.search(r"^from django\.db import models", content, re.MULTILINE):
                 pattern.orm_used = "Django ORM"
                 if "models.UUIDField" in content:
                     pattern.id_type = "UUID (Django UUIDField)"
+                elif "models.AutoField" in content or "models.BigAutoField" in content:
+                    pattern.id_type = "AutoField (Django)"
+                if "models.DateTimeField" in content:
+                    pattern.timestamp_type = "DateTimeField (Django)"
                 if "on_delete=models.CASCADE" in content:
                     pattern.cascade_deletes = True
+
+            # Django settings file detection (DATABASES may be in settings.py
+            # which imports from django.conf, not django.db)
+            if re.search(r"^from django", content, re.MULTILINE) or \
+               re.search(r"^import django\b", content, re.MULTILINE):
+                if "DATABASES" in content and not pattern.connection_pattern:
+                    pattern.connection_pattern = "Django DATABASES setting"
+                if not pattern.orm_used and "models.Model" in content:
+                    pattern.orm_used = "Django ORM"
+
             if re.search(r"^from sqlalchemy\b", content, re.MULTILINE):
-                pattern.orm_used = "SQLAlchemy"
+                if not pattern.orm_used:
+                    pattern.orm_used = "SQLAlchemy"
+                if "UUID" in content:
+                    pattern.id_type = "UUID (SQLAlchemy)"
+                if "DateTime" in content:
+                    pattern.timestamp_type = "DateTime (SQLAlchemy)"
                 if "create_engine(" in content:
                     pattern.connection_pattern = "SQLAlchemy: create_engine()"
-            if file_path.suffix in (".js", ".ts", ".tsx") and re.search(r"^import\b.*@prisma/client", content, re.MULTILINE):
-                pattern.orm_used = "Prisma"
+
+            if re.search(r"^from tortoise\b|^from tortoise\.models\b", content, re.MULTILINE):
+                if not pattern.orm_used:
+                    pattern.orm_used = "Tortoise ORM"
+
+            if re.search(r"^from mongoengine\b|^import mongoengine\b", content, re.MULTILINE):
+                if not pattern.orm_used:
+                    pattern.orm_used = "MongoEngine"
+
+            if re.search(r"^from motor\b|^import motor\b", content, re.MULTILINE):
+                if not pattern.orm_used:
+                    pattern.orm_used = "Motor (async MongoDB)"
+
+        # Prisma lives in JS/TS files -- separate pass
+        for file_path in files:
+            if file_path.suffix not in (".js", ".ts", ".tsx", ".jsx"):
+                continue
+            content = self._safe_read_file(file_path)
+            if not content:
+                continue
+            if re.search(r"^import\b.*@prisma/client", content, re.MULTILINE):
+                if not pattern.orm_used:
+                    pattern.orm_used = "Prisma"
+                break
 
         return pattern
 
