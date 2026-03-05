@@ -27,6 +27,7 @@ from saar.models import (
     ConfigPattern,
     DatabasePattern,
     ErrorPattern,
+    FrontendPattern,
     LoggingPattern,
     NamingConventions,
     ServicePattern,
@@ -692,14 +693,13 @@ class DNAExtractor:
 
         return pattern
 
-    def _extract_frontend_patterns(self, repo_path: Path) -> Optional["FrontendPattern"]:
+    def _extract_frontend_patterns(self, repo_path: Path) -> Optional[FrontendPattern]:
         """Detect frontend stack by reading package.json files.
 
         Reads all package.json files found (handles monorepos with multiple
         frontend packages). Returns None if no package.json found -- meaning
         this is a pure backend/Python repo.
         """
-        from saar.models import FrontendPattern
         import json
 
         pkg_files = [

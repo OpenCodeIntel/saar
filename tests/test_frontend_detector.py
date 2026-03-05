@@ -6,8 +6,6 @@ no real network calls, no real repos needed.
 import json
 from pathlib import Path
 
-import pytest
-
 from saar.extractor import DNAExtractor
 from saar.models import FrontendPattern
 
@@ -254,7 +252,7 @@ class TestFrontendInFormatters:
 
     def test_agents_md_includes_frontend_section(self, tmp_path: Path):
         from saar.formatters.agents_md import render_agents_md
-        from saar.models import CodebaseDNA, FrontendPattern
+        from saar.models import CodebaseDNA
 
         dna = CodebaseDNA(
             repo_name="test",
@@ -365,7 +363,7 @@ class TestReactPatternDetection:
 
     def test_react_patterns_rendered_in_agents_md(self, tmp_path: Path):
         from saar.formatters.agents_md import render_agents_md
-        from saar.models import CodebaseDNA, FrontendPattern
+        from saar.models import CodebaseDNA
 
         dna = CodebaseDNA(
             repo_name="test",
