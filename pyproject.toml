@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "saar"
-version = "0.2.0"
-description = "Extract the essence of your codebase. Auto-generate CLAUDE.md, .cursorrules, and copilot-instructions.md."
+version = "0.3.0"
+description = "Extract the essence of your codebase. Auto-generate AGENTS.md, CLAUDE.md, .cursorrules and more."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
