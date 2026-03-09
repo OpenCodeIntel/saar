@@ -365,3 +365,71 @@ class TestSaarAddCommand:
         result = runner.invoke(app, ["add", "Never use sync with boto3", "--repo", str(tmp_path)])
         assert result.exit_code == 0
         assert "Never use sync with boto3" in result.stdout
+
+
+class TestInterviewUX:
+    """UX invariants -- things that must never regress."""
+
+    def test_no_multiline_prompts_in_interview(self):
+        """multiline=True in questionary requires Alt+Enter to submit.
+
+        This is a UX trap -- developers type their answer, press Enter,
+        and the prompt appears frozen. Every multiline prompt is a bug.
+        Single-line prompts with semicolons as separators are the right pattern.
+
+        This test reads the source file directly so it catches the regression
+        even if the prompt is added inside a conditional branch.
+        """
+        import ast
+        from pathlib import Path
+
+        source = (Path(__file__).parent.parent / "saar" / "interview.py").read_text()
+        tree = ast.parse(source)
+
+        violations = []
+        for node in ast.walk(tree):
+            # look for keyword arguments named 'multiline' with value True
+            if isinstance(node, ast.Call):
+                for keyword in node.keywords:
+                    if (
+                        keyword.arg == "multiline"
+                        and isinstance(keyword.value, ast.Constant)
+                        and keyword.value.value is True
+                    ):
+                        violations.append(f"line {node.lineno}: multiline=True found")
+
+        assert not violations, (
+            "multiline=True detected in interview.py -- this breaks UX. "
+            "Use single-line prompts with semicolons as separators instead.\n"
+            + "\n".join(violations)
+        )
+
+    def test_all_questions_have_instructions(self):
+        """Every questionary.text() call should have an instruction kwarg.
+
+        Instructions show the user what format to use. Without them,
+        developers don't know how to answer and leave fields blank.
+        """
+        import ast
+        from pathlib import Path
+
+        source = (Path(__file__).parent.parent / "saar" / "interview.py").read_text()
+        tree = ast.parse(source)
+
+        violations = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                # check if this is a questionary.text() call
+                is_q_text = (
+                    isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "text"
+                )
+                if is_q_text:
+                    kwarg_names = {kw.arg for kw in node.keywords}
+                    if "instruction" not in kwarg_names:
+                        violations.append(f"line {node.lineno}: questionary.text() missing instruction=")
+
+        assert not violations, (
+            "questionary.text() calls without instruction= kwarg found:\n"
+            + "\n".join(violations)
+        )

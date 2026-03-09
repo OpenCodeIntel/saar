@@ -259,17 +259,15 @@ def run_interview(
     never_do = questionary.text(
         "What are the absolute 'never do' rules in this codebase?",
         default=default("never_do"),
-        instruction="(gotchas, frozen modules, anti-patterns -- e.g. 'Never modify billing/, never use sync in async endpoints')",
+        instruction="(separate multiple rules with semicolons -- e.g. 'Never modify billing/; never use sync in async endpoints')",
         style=saar_style,
-        multiline=True,
     ).ask()
 
     domain_terms = questionary.text(
         "Any domain-specific terms AI should know?",
         default=default("domain_terms"),
-        instruction="(terms with non-obvious meanings -- e.g. 'Workspace = tenant, not directory')",
+        instruction="(separate with semicolons -- e.g. 'Workspace = tenant; Plan = subscription tier')",
         style=saar_style,
-        multiline=True,
     ).ask()
 
     verify = questionary.text(
@@ -288,17 +286,15 @@ def run_interview(
         auth_gotchas = questionary.text(
             "Any auth / security gotchas?",
             default=default("auth_gotchas"),
-            instruction="(e.g. 'JWT tokens expire in 15min, always refresh. Never log token values.')",
+            instruction="(e.g. 'JWT tokens expire in 15min, always refresh; never log token values')",
             style=saar_style,
-            multiline=True,
         ).ask()
 
         off_limits = questionary.text(
             "Files or modules AI should NEVER modify?",
             default=default("off_limits"),
-            instruction="(e.g. 'core/auth.py has clock-skew workaround, billing/ is frozen')",
+            instruction="(e.g. 'core/auth.py; billing/ is frozen')",
             style=saar_style,
-            multiline=True,
         ).ask()
 
         extra = questionary.text(
@@ -306,7 +302,6 @@ def run_interview(
             default=default("extra_context"),
             instruction="(optional -- press Enter to skip)",
             style=saar_style,
-            multiline=True,
         ).ask()
 
     # -- handle Ctrl+C / None answers cleanly ----------------------------
