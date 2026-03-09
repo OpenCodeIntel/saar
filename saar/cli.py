@@ -527,8 +527,17 @@ def _write_with_markers(
         console.print(f"  [green]updated[/green] {target} (prepended auto block)")
         return
 
-    # Splice: keep everything before the start marker and after the end marker
+    # Splice: keep everything before the start marker and after the end marker.
+    # Use find() for END to get the first legitimate closing marker (the one that
+    # belongs to this auto-block). Then strip any orphaned SAAR markers from the
+    # preserved manual content -- these can accumulate from old runs or copy-paste.
+    # rfind() would be wrong here: it would swallow manual content sitting between
+    # the legitimate END and an orphaned END. (OPE-169)
     before = existing[:start_idx]
     after = existing[end_idx + len(_MARKER_END):]
+
+    # Strip any orphaned SAAR markers from the preserved manual section.
+    after = after.replace(_MARKER_START, "").replace(_MARKER_END, "")
+
     target.write_text(before + wrapped + after, encoding="utf-8")
     console.print(f"  [green]updated[/green] {target} (preserved manual edits)")
