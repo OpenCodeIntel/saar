@@ -257,12 +257,20 @@ def extract(
     verbose: bool = typer.Option(
         False,
         "--verbose", "-v",
-        help="Show detailed analysis progress.",
+        help="Show full output without line cap. Also enables debug logs.",
+    ),
+    budget: int = typer.Option(
+        100,
+        "--budget",
+        help="Max lines in generated file (default 100). 0 = unlimited. --verbose overrides to 0.",
+        min=0,
     ),
 ) -> None:
     """Analyze a codebase and extract its architectural DNA."""
     log_level = logging.DEBUG if verbose else logging.WARNING
     logging.basicConfig(level=log_level, format="%(message)s")
+    # --verbose disables line cap -- full output
+    effective_budget = 0 if verbose else budget
 
     console.print(f"[bold]saar[/bold] analyzing [cyan]{repo_path.name}[/cyan]...")
 
@@ -330,7 +338,7 @@ def extract(
     from saar.formatters import render
 
     for fmt in target_formats:
-        text = render(dna, fmt.value)
+        text = render(dna, fmt.value, budget=effective_budget)
         target = _resolve_output_path(fmt, output, repo_path)
 
         if target is None:

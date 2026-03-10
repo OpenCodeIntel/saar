@@ -20,9 +20,24 @@ _RENDERERS = {
 }
 
 
-def render(dna: CodebaseDNA, format: str) -> str:
-    """Render DNA in the given format. Raises KeyError for unknown formats."""
+def render(dna: CodebaseDNA, format: str, budget: int = 100) -> str:
+    """Render DNA in the given format, applying a line budget.
+
+    Args:
+        dna: Extracted codebase DNA.
+        format: Output format key (agents, claude, cursorrules, copilot, markdown).
+        budget: Max lines in output. 0 = unlimited (--verbose mode).
+
+    Raises:
+        KeyError: Unknown format string.
+    """
+    from saar.formatters.budget import apply_budget
+
     renderer = _RENDERERS.get(format)
     if renderer is None:
         raise KeyError(f"Unknown format: {format}. Options: {list(_RENDERERS.keys())}")
-    return renderer(dna)
+    text = renderer(dna)
+    # markdown format goes to stdout for human reading -- no budget applied
+    if format == "markdown":
+        return text
+    return apply_budget(text, budget)
