@@ -320,6 +320,11 @@ def extract(
         help="Max lines in generated file (default 100). 0 = unlimited. --verbose overrides to 0.",
         min=0,
     ),
+    index: bool = typer.Option(
+        False,
+        "--index",
+        help="After extraction, index this repo into OCI for AI-powered semantic search via MCP. Requires OCI API key in ~/.saar/config.yaml.",
+    ),
 ) -> None:
     """Analyze a codebase and extract its architectural DNA."""
     log_level = logging.DEBUG if verbose else logging.WARNING
@@ -409,6 +414,10 @@ def extract(
         save_snapshot(repo_path, dna)
     except Exception:
         pass  # snapshot failure must never break extract
+
+    # -- optional OCI indexing (--index flag) --
+    if index:
+        _run_oci_indexing(repo_path, console)
 
     console.print("[bold green]done[/bold green]")
 
@@ -611,3 +620,103 @@ def _write_with_markers(
 
     target.write_text(before + wrapped + after, encoding="utf-8")
     console.print(f"  [green]updated[/green] {target} (preserved manual edits)")
+
+
+def _run_oci_indexing(repo_path: Path, console) -> None:
+    """Handle the --index flag: add repo to OCI and trigger indexing.
+
+    Fails gracefully -- a failure here must never prevent saar extract
+    from completing successfully. The AGENTS.md has already been written.
+    """
+    from saar.oci_client import (
+        get_api_key, get_base_url,
+        detect_git_url, detect_default_branch,
+        add_repository, poll_until_indexed,
+        save_repo_id, load_repo_id,
+        OCIAuthError, OCIAPIError,
+    )
+
+    console.print()
+    console.print("[bold]OCI indexing[/bold]")
+
+    # -- check for API key --
+    api_key = get_api_key()
+    if not api_key:
+        console.print(
+            "  [yellow]No OCI API key found.[/yellow]\n"
+            "  1. Go to [link=https://opencodeintel.com/dashboard/api-keys]opencodeintel.com/dashboard/api-keys[/link]\n"
+            "  2. Generate a key and save it:\n"
+            "     [dim]echo 'oci_api_key: ci_your_key_here' >> ~/.saar/config.yaml[/dim]\n"
+            "  3. Re-run with [bold]--index[/bold]"
+        )
+        return
+
+    base_url = get_base_url()
+
+    # -- detect git URL --
+    git_url = detect_git_url(repo_path)
+    if not git_url:
+        console.print(
+            "  [yellow]Could not detect git remote URL.[/yellow]\n"
+            "  Make sure this repo has an 'origin' remote:\n"
+            "  [dim]git remote add origin https://github.com/you/your-repo.git[/dim]"
+        )
+        return
+
+    branch = detect_default_branch(repo_path)
+    repo_name = repo_path.name
+
+    console.print(f"  repo:   [cyan]{git_url}[/cyan]")
+    console.print(f"  branch: [cyan]{branch}[/cyan]")
+
+    try:
+        # Check if already indexed -- avoid duplicate repos
+        existing_repo_id = load_repo_id(repo_path)
+        if existing_repo_id:
+            console.print(f"  [dim]Already in OCI (repo_id: {existing_repo_id[:8]}...). Re-indexing...[/dim]")
+            repo_id = existing_repo_id
+        else:
+            # Add repo
+            console.print("  Adding to OCI...")
+            repo = add_repository(
+                name=repo_name,
+                git_url=git_url,
+                branch=branch,
+                api_key=api_key,
+                base_url=base_url,
+            )
+            repo_id = repo.get("id") or repo.get("repo_id")
+            if not repo_id:
+                raise OCIAPIError("No repo_id returned from API")
+            save_repo_id(repo_path, repo_id)
+            console.print(f"  [green]Added[/green] (id: {repo_id[:8]}...)")
+
+        # Trigger indexing
+        console.print("  Indexing...")
+
+        def on_tick(elapsed: int, status: str) -> None:
+            console.print(f"  [dim]  {elapsed}s -- {status}...[/dim]", end="\r")
+
+        result = poll_until_indexed(
+            repo_id=repo_id,
+            api_key=api_key,
+            base_url=base_url,
+            on_tick=on_tick,
+        )
+
+        functions = result.get("total_functions") or result.get("function_count", 0)
+        console.print(f"\n  [green]Indexed[/green] {functions:,} functions")
+        console.print(
+            "  [dim]Use codeintel:search_code in Claude Desktop / Claude Code "
+            "to query this repo via MCP.[/dim]"
+        )
+
+    except OCIAuthError as e:
+        console.print(f"  [red]Auth error:[/red] {e}")
+        console.print("  Get a new key at [link=https://opencodeintel.com/dashboard/api-keys]opencodeintel.com/dashboard/api-keys[/link]")
+    except OCIAPIError as e:
+        console.print(f"  [yellow]OCI indexing skipped:[/yellow] {e}")
+        console.print("  AGENTS.md was still generated successfully.")
+    except Exception as e:
+        console.print(f"  [yellow]OCI indexing skipped:[/yellow] {e}")
+        console.print("  AGENTS.md was still generated successfully.")
