@@ -204,7 +204,7 @@ class DNAExtractor:
         extensions = {".py", ".js", ".jsx", ".ts", ".tsx", ".sql"}
 
         try:
-            for item in repo_path.rglob("*"):
+            for item in sorted(repo_path.rglob("*")):
                 if item.is_symlink():
                     continue
                 if item.is_file() and item.suffix in extensions:
@@ -410,9 +410,9 @@ class DNAExtractor:
             if "@Public()" in content:
                 pattern.auth_decorators.append("@Public()")
 
-        pattern.middleware_used = list(set(pattern.middleware_used))
-        pattern.auth_decorators = list(set(pattern.auth_decorators))
-        pattern.ownership_checks = list(set(pattern.ownership_checks))
+        pattern.middleware_used = sorted(set(pattern.middleware_used))
+        pattern.auth_decorators = sorted(set(pattern.auth_decorators))
+        pattern.ownership_checks = sorted(set(pattern.ownership_checks))
         return pattern
 
     def _extract_middleware_patterns(
@@ -445,7 +445,7 @@ class DNAExtractor:
                     mw = re.findall(r"app\.use\((\w+)", content)
                     patterns.extend(mw[:3])
 
-        return list(set(patterns))
+        return sorted(set(patterns))
 
     def _extract_service_patterns(self, files: List[Path], repo_path: Path) -> ServicePattern:
         pattern = ServicePattern()
@@ -462,7 +462,7 @@ class DNAExtractor:
 
         services_dir = repo_path / "services"
         if services_dir.exists():
-            for service_file in services_dir.glob("*.py"):
+            for service_file in sorted(services_dir.glob("*.py")):
                 if service_file.name.startswith("_"):
                     continue
                 content = self._safe_read_file(service_file)
@@ -592,7 +592,7 @@ class DNAExtractor:
                     continue
                 pattern.exception_classes.append(name)
 
-        pattern.exception_classes = list(set(pattern.exception_classes))
+        pattern.exception_classes = sorted(set(pattern.exception_classes))
         return pattern
 
     def _extract_logging_patterns(self, files: List[Path]) -> LoggingPattern:
@@ -729,7 +729,7 @@ class DNAExtractor:
 
         routes_dir = repo_path / "routes"
         if routes_dir.exists():
-            for route_file in routes_dir.glob("*.py"):
+            for route_file in sorted(routes_dir.glob("*.py")):
                 content = self._safe_read_file(route_file)
                 if content and "APIRouter(" in content:
                     match = re.search(r"APIRouter\(prefix=[\"']([^\"']+)[\"']", content)
