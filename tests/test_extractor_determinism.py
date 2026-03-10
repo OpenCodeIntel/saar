@@ -116,7 +116,6 @@ class TestDeterministicOutput:
         list(set(...)) produces non-deterministic iteration order due to Python
         hash randomization. Always use sorted(set(...)) instead.
         """
-        import ast
         from pathlib import Path
 
         source = (Path(__file__).parent.parent / "saar" / "extractor.py").read_text()

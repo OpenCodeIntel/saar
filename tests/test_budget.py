@@ -9,7 +9,6 @@ Budget module must:
 - Add a clear truncation note telling user how to get full output
 - Be disabled by --verbose and --budget 0
 """
-import pytest
 from pathlib import Path
 from typer.testing import CliRunner
 
@@ -80,7 +79,7 @@ class TestApplyBudgetCore:
         assert "## Frontend" in result
         assert "## Architecture" in result
         # Project Structure should be cut or heavily truncated
-        project_lines = [l for l in result.splitlines() if "big tree" in l]
+        project_lines = [line for line in result.splitlines() if "big tree" in line]
         assert len(project_lines) < 30, "Project Structure should be cut under budget"
 
     def test_tribal_knowledge_always_preserved(self):
