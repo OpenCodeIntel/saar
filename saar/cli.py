@@ -215,6 +215,61 @@ def add(
 
 
 @app.command()
+def diff(
+    repo_path: Path = typer.Argument(
+        Path("."),
+        help="Path to the repository to check. Defaults to current directory.",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+) -> None:
+    """Detect when AGENTS.md is stale vs the current codebase.
+
+    Compares the DNA snapshot saved during the last extract against the
+    current codebase state. Shows exactly what changed and whether
+    AGENTS.md needs to be regenerated.
+
+    Examples:
+
+      saar diff
+
+      saar diff ./my-repo
+    """
+    from saar.differ import load_snapshot, snapshot_from_dna, diff_snapshots, format_diff_output
+    from saar.extractor import DNAExtractor
+
+    # load existing snapshot
+    old_snapshot = load_snapshot(repo_path)
+    if old_snapshot is None:
+        console.print(
+            "[yellow]No snapshot found.[/yellow] "
+            "Run [bold]saar extract[/bold] first to create a baseline."
+        )
+        raise typer.Exit(code=0)
+
+    console.print(f"[bold]saar[/bold] checking [cyan]{repo_path.name}[/cyan] for changes...")
+
+    # re-extract current DNA (fast -- same pipeline)
+    extractor = DNAExtractor()
+    dna = extractor.extract(str(repo_path))
+    if dna is None:
+        console.print("[red]Could not analyze codebase.[/red]")
+        raise typer.Exit(code=1)
+
+    # build current snapshot and diff
+    new_snapshot = snapshot_from_dna(dna)
+    changes = diff_snapshots(old_snapshot, new_snapshot)
+    output = format_diff_output(changes, old_snapshot, repo_path.name)
+
+    console.print(output)
+
+    # exit code 1 if changes found (useful for CI)
+    raise typer.Exit(code=1 if changes else 0)
+
+
+@app.command()
 def extract(
     repo_path: Path = typer.Argument(
         ...,
@@ -347,6 +402,13 @@ def extract(
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
             _write_with_markers(target, text, force=force, console=console)
+
+    # save DNA snapshot for saar diff (after writing files)
+    try:
+        from saar.differ import save_snapshot
+        save_snapshot(repo_path, dna)
+    except Exception:
+        pass  # snapshot failure must never break extract
 
     console.print("[bold green]done[/bold green]")
 
