@@ -169,6 +169,19 @@ def render_agents_md(dna: CodebaseDNA) -> str:
                 dep_note = f" ({d} dependents)" if d else ""
                 lines.append(f"- `{f}`{dep_note}")
 
+    # -- canonical examples -- most-imported file per category (OPE-142) --
+    if dna.canonical_examples:
+        lines.append("\n## Canonical Examples\n")
+        lines.append(
+            "When adding new code, follow these existing files as reference.\n"
+        )
+        for ex in dna.canonical_examples[:6]:
+            file_path = ex.get("file", "")
+            count = ex.get("import_count", 0)
+            reason = ex.get("reason", f"follow `{file_path}`")
+            if file_path:
+                lines.append(f"- {reason} ({count} importers)")
+
     # -- project structure --
     if dna.project_structure:
         lines.append("\n## Project Structure\n")

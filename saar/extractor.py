@@ -1367,6 +1367,9 @@ class DNAExtractor:
         # Enrich with dependency graph data
         self._enrich_with_deps(dna, str(path))
 
+        # Extract canonical examples from dependency data (OPE-142)
+        self._extract_canonical_examples(dna)
+
         elapsed = time.time() - start
         logger.info(
             "DNA extraction complete: %.2fs, %d files read, %d skipped",
@@ -1411,3 +1414,70 @@ class DNAExtractor:
             )
         except Exception as e:
             logger.warning("Dependency analysis failed: %s", e)
+
+    def _extract_canonical_examples(self, dna: CodebaseDNA) -> None:
+        """Nominate the most-imported file per category as a canonical example.
+
+        The highest-value thing in an AGENTS.md is "For new hooks, follow
+        useUserUsage.ts." Static analysis can find this -- it's the file that
+        gets imported the most within its category.
+
+        Uses critical_files (fan-in counts) already collected by _enrich_with_deps.
+        Groups by file category, picks the top file per category.
+
+        Why fan-in (in-degree)?
+            A file imported by many others is the de-facto standard for that
+            pattern. It didn't become popular by accident -- it's the one devs
+            trust enough to reuse. That's the definition of canonical.
+        """
+        if not dna.critical_files:
+            return
+
+        # Categories: map path patterns to human labels
+        # Order matters -- first match wins
+        CATEGORIES = [
+            ("hooks/",      "hooks",      "For new hooks, follow"),
+            ("services/",   "services",   "For new services, follow"),
+            ("components/", "components", "For new components, follow"),
+            ("pages/",      "pages",      "For new pages, follow"),
+            ("routes/",     "routes",     "For new routes, follow"),
+            ("middleware/",  "middleware", "For new middleware, follow"),
+            ("utils/",      "utils",      "For new utilities, follow"),
+            ("tests/",      "tests",      "For new tests, follow"),
+            ("test/",       "tests",      "For new tests, follow"),
+        ]
+
+        # Group critical files by category, keeping the highest fan-in per category
+        seen_categories: dict = {}
+
+        for entry in dna.critical_files:
+            file_path = entry.get("file", "") if isinstance(entry, dict) else str(entry)
+            dependents = entry.get("dependents", 0) if isinstance(entry, dict) else 0
+
+            if not file_path or dependents < 2:
+                # Skip files with fewer than 2 importers -- not canonical enough
+                continue
+
+            # Normalise path separators
+            normalised = file_path.replace("\\", "/")
+
+            for pattern, category, reason_prefix in CATEGORIES:
+                if pattern in normalised:
+                    # Keep only the most-imported file per category
+                    if category not in seen_categories or dependents > seen_categories[category]["import_count"]:
+                        seen_categories[category] = {
+                            "category": category,
+                            "file": file_path,
+                            "import_count": dependents,
+                            "reason": f"{reason_prefix} `{file_path}`",
+                        }
+                    break  # first matching category wins
+
+        # Sort by import count descending so highest-confidence examples appear first
+        dna.canonical_examples = sorted(
+            seen_categories.values(),
+            key=lambda x: x["import_count"],
+            reverse=True,
+        )
+
+        logger.info("Canonical examples: %d categories found", len(dna.canonical_examples))

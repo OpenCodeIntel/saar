@@ -162,6 +162,9 @@ class CodebaseDNA:
     circular_dependencies: List = field(default_factory=list)
     critical_files: List = field(default_factory=list)
     total_dependencies: int = 0
+    # canonical examples -- most-imported file per category (OPE-142)
+    # Each entry: {"category": str, "file": str, "import_count": int, "reason": str}
+    canonical_examples: List = field(default_factory=list)
 
     def to_dict(self) -> Dict:
         return asdict(self)
