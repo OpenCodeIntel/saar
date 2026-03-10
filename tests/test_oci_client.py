@@ -286,6 +286,9 @@ class TestIndexCLI:
         assert "saved-repo-id" in saved_ids
 
     def test_index_help_available(self):
+        import re
         result = runner.invoke(app, ["extract", "--help"])
         assert result.exit_code == 0
-        assert "--index" in result.output
+        # Strip ANSI escape codes before checking -- Rich adds color codes
+        clean = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "--index" in clean
