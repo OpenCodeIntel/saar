@@ -240,6 +240,21 @@ def run_interview(
     if mode is None or mode == "skip":
         return cached
 
+    # -- build stack-aware questions from detected DNA -------------------
+    from saar.interview_questions import (
+        build_never_do_question,
+        build_verify_question,
+        build_auth_question,
+        build_domain_terms_question,
+        build_off_limits_question,
+    )
+
+    q_never_do = build_never_do_question(dna)
+    q_verify = build_verify_question(dna)
+    q_auth = build_auth_question(dna)
+    q_domain = build_domain_terms_question(dna)
+    q_off_limits = build_off_limits_question(dna)
+
     # -- pre-fill defaults from cache ------------------------------------
     def default(field: str, fallback: str = "") -> str:
         if cached:
@@ -257,23 +272,23 @@ def run_interview(
     ).ask()
 
     never_do = questionary.text(
-        "What are the absolute 'never do' rules in this codebase?",
-        default=default("never_do"),
-        instruction="(separate multiple rules with semicolons -- e.g. 'Never modify billing/; never use sync in async endpoints')",
+        q_never_do.question,
+        default=default("never_do", q_never_do.default_hint),
+        instruction=f"({q_never_do.instruction})",
         style=saar_style,
     ).ask()
 
     domain_terms = questionary.text(
-        "Any domain-specific terms AI should know?",
+        q_domain.question,
         default=default("domain_terms"),
-        instruction="(separate with semicolons -- e.g. 'Workspace = tenant; Plan = subscription tier')",
+        instruction=f"({q_domain.instruction})",
         style=saar_style,
     ).ask()
 
     verify = questionary.text(
-        "How do you verify that changes actually work?",
-        default=default("verify_workflow", "Run tests"),
-        instruction="(full loop -- e.g. 'pytest -x, then docker compose up and curl /health')",
+        q_verify.question,
+        default=default("verify_workflow", q_verify.default_hint),
+        instruction=f"({q_verify.instruction})",
         style=saar_style,
     ).ask()
 
@@ -284,16 +299,16 @@ def run_interview(
 
     if mode == "full":
         auth_gotchas = questionary.text(
-            "Any auth / security gotchas?",
+            q_auth.question,
             default=default("auth_gotchas"),
-            instruction="(e.g. 'JWT tokens expire in 15min, always refresh; never log token values')",
+            instruction=f"({q_auth.instruction})",
             style=saar_style,
         ).ask()
 
         off_limits = questionary.text(
-            "Files or modules AI should NEVER modify?",
+            q_off_limits.question,
             default=default("off_limits"),
-            instruction="(e.g. 'core/auth.py; billing/ is frozen')",
+            instruction=f"({q_off_limits.instruction})",
             style=saar_style,
         ).ask()
 
