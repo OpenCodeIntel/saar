@@ -1,281 +1,262 @@
+<div align="center">
+
+<img src="https://getsaar.com/logo.png" alt="saar" width="80" />
+
 # saar
 
-Extract the essence of your codebase. Auto-generate AI context files that actually reflect how your team writes code.
+**The open source tool that makes AI coding assistants actually know your codebase.**
 
-```bash
-pipx install saar
-saar extract ./my-repo
-```
+Free. Local. Works with Claude Code, Cursor, Copilot, Gemini CLI — all at once.
+
+[![PyPI version](https://img.shields.io/pypi/v/saar.svg?color=blue)](https://pypi.org/project/saar/)
+[![Downloads](https://img.shields.io/pypi/dm/saar.svg)](https://pypi.org/project/saar/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/OpenCodeIntel/saar/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenCodeIntel/saar/actions)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
+[**Try it →**](https://getsaar.com) · [**Discord**](https://discord.gg/opencodeintel) · [**Docs**](https://getsaar.com/docs) · [**OCI: Semantic Search**](https://opencodeintel.com)
+
+</div>
 
 ---
 
 ## The problem
 
-AI coding tools know everything about every codebase except yours.
+Claude Code, Cursor, Copilot, and Gemini CLI are incredible tools. We use them every day.
 
-They write `npm install` in your bun repo. They invent exception classes you already have. They touch frozen modules. Every session starts from zero -- no memory of your conventions, your gotchas, your patterns. You spend the session correcting the same mistakes.
+But they have one fundamental flaw: **they don't know YOUR codebase.**
 
-The fix is a context file (CLAUDE.md, AGENTS.md, .cursorrules) that tells your AI assistant how your specific codebase works. But nobody writes these well. You forget the exception class buried in auth.py. You forget the service singleton pattern. You forget the rule you added six months ago. The file goes stale the week after you write it.
+Every session starts from zero. The AI writes `npm install` in your `bun` repo. It invents `RateLimitException` when you already have `LimitCheckError`. It puts the file in the wrong folder. It uses the wrong auth decorator.
 
-Saar generates it automatically, keeps it updated, and lets you accumulate corrections over time.
+You spend 20 minutes correcting what should have taken 2.
 
----
+> **ETH Zurich studied 5,694 pull requests and found AI tools increase costs 20%+ when they lack precise codebase context.** 66% of developers cite "almost right but not quite" as their #1 AI frustration. *(Stack Overflow 2025, 49,000 respondents)*
 
-## How it works
+The fix is a context file — AGENTS.md, CLAUDE.md, .cursorrules — that tells your AI exactly how your codebase works. But nobody writes these well. They go stale. They're too long. The AI ignores them.
 
-```
-saar extract ./my-repo
-```
+**saar fixes this in 30 seconds.**
 
-Three things happen:
-
-1. **Static analysis** -- tree-sitter AST parsing across every Python and TypeScript/JavaScript file. Detects auth patterns, service architecture, exception classes, database conventions, naming conventions, dependency graph, critical files.
-
-2. **Guided interview** -- 4-7 questions that capture what static analysis cannot. Domain vocabulary, gotchas, off-limits files, verification workflow. Answers cached in `.saar/config.json`, never asked again.
-
-3. **AGENTS.md generated** -- cross-tool standard read by Claude Code, Cursor, Copilot, Codex, Gemini CLI. Also generates CLAUDE.md, .cursorrules, copilot-instructions.md on request.
-
-Runs locally. Your code never leaves your machine. No API keys required.
 
 ---
 
-## Real output
-
-Running on our own codebase (saar itself):
-
-```
-saar analyzing saar...
-Found 24 code files (15 app, 9 test)
-Style: 252 functions, 38 classes, 21% async, 92% typed
-Graph built: 24 nodes, 46 edges, 0 cycles
-DNA extraction complete: 0.75s
-```
-
-Generated AGENTS.md (auto-detected section):
-
-```markdown
-252 functions, 38 classes, 21% async, 92% type-hinted.
-Languages: python (24 files)
-
-## Coding Conventions
-- Functions: snake_case
-- Classes: PascalCase
-- Constants: UPPER_SNAKE_CASE
-
-## Critical Files
-- saar/models.py (14 dependents)
-- saar/interview.py (3 dependents)
-- saar/cli.py (3 dependents)
-
-## Testing
-- Framework: pytest
-- Pattern: test_*.py
-- Shared fixtures in conftest.py
-```
-
-Plus tribal knowledge from the interview:
-
-```markdown
-## Tribal Knowledge
-
-This project: CLI tool that extracts codebase DNA and generates AI context files
-
-### Never Do
-- Never add external infrastructure dependencies (no network calls)
-- Never use print() -- always use logging
-
-### Domain Vocabulary
-- DNA = extracted architectural patterns of a codebase
-- Tribal knowledge = context only humans can provide
-
-### Off-Limits Files
-- saar/models.py -- core data contract, discuss before changing
-```
-
----
-
-## Accumulating corrections
-
-The highest-value content in any context file is the corrections -- things AI got wrong, rules discovered the hard way. Saar has a command for this:
+## Install
 
 ```bash
-# AI just tried to use npm in your bun repo
-saar add "Never use npm -- this project uses bun only"
-
-# Claude modified a frozen module
-saar add --off-limits "billing/ -- legacy Stripe integration, frozen until Q3"
-
-# AI used generic exceptions instead of your domain ones
-saar add --domain "AuthenticationError -- use this, not HTTPException, for auth failures"
-
-# Re-generate with the new rule
-saar extract . --no-interview
+pip install saar
 ```
 
-Each correction is appended as a bullet to your tribal knowledge. Every subsequent generation includes it. The file gets better every time AI makes a mistake.
+That's it. No account. No API key. No config. Your code never leaves your machine.
 
 ---
 
-## AI enrichment
-
-Raw corrections get polished into precise, actionable rules:
+## One command. Then AI just gets it.
 
 ```bash
-# Set ANTHROPIC_API_KEY, then:
-saar enrich
+cd my-project
+saar extract .
 ```
 
-Turns `"don't touch billing it's messy"` into:
+**What happens in 11 seconds:**
 
 ```
-NEVER modify billing/ -- legacy Stripe integration, no test coverage,
-frozen until Q3 migration. Changes require DBA review.
+saar analyzing my-project...
+
+  Backend     FastAPI  Python (47 files)
+  Frontend    React  TypeScript  Vite  TanStack Query
+  Auth        require_auth  public_auth  (2 patterns)
+  Exceptions  AuthenticationError, LimitCheckError,
+              TokenExpiredError, NoteError (+6 more)
+  Canonical   For new hooks: useUserData.ts (12 importers)
+  Scale       1,274 functions  276 files  72% typed
+
+  wrote AGENTS.md  (70 lines)
+done
 ```
 
-Or run enrichment inline:
+saar detected your stack, your auth pattern, all 9 of your custom exception classes, your canonical hook, and the right test command. **You didn't tell it any of that.**
+
+Drop `AGENTS.md` in your repo root. Claude Code, Cursor, Copilot, and Gemini CLI all pick it up automatically.
+
+---
+
+## saar vs everything else
+
+| | saar | `/init` (Claude Code) | Cursor @codebase | Manual |
+|---|---|---|---|---|
+| Detects auth patterns | ✅ | ⚠️ basic | ❌ | depends |
+| Detects exception classes | ✅ | ❌ | ❌ | depends |
+| Canonical example detection | ✅ | ❌ | ❌ | rarely |
+| Output size | **70 lines** | 300+ lines | N/A | varies |
+| ETH Zurich recommended | ✅ short+precise | ❌ too long | ❌ | ✅ if done right |
+| Works with all AI tools | ✅ | Claude only | Cursor only | ✅ |
+| Staleness detection | ✅ `saar diff` | ❌ | ❌ | ❌ |
+| Free + local | ✅ | ✅ | ✅ | ✅ |
+
+> *ETH Zurich (Feb 2026, arxiv:2602.11988): LLM-generated context files reduce task success and increase costs 20%+. Short, human-verified files improve performance 4%. saar generates short, precise files by default.*
+
+
+---
+
+## When your codebase changes, saar tells you
 
 ```bash
-saar extract . --enrich
+saar diff .
 ```
+
+```
+saar checking my-project for changes...
+  AGENTS.md last generated: 14 days ago
+
+  Changed since last extract (2 changes):
+  ~ Package manager changed: npm → bun
+  + Exception class added: RateLimitError
+
+  Recommendation: re-run saar extract to update AGENTS.md
+```
+
+Nobody else has this. Your AGENTS.md was telling Claude to use `npm`. saar caught it.
+
+---
+
+## Accumulate corrections over time
+
+Every time AI gets something wrong, add it without re-running analysis:
+
+```bash
+saar add "Never use npm — this project uses bun only"
+saar add --off-limits "billing/ — legacy Stripe integration, frozen"
+saar add --domain "Workspace = tenant, not a directory"
+saar add --verify "pytest -x && docker compose up && curl localhost:8000/health"
+```
+
+Each correction makes the file better. The AI stops making the same mistake twice.
 
 ---
 
 ## All commands
 
 ```bash
-# generate AGENTS.md (default -- cross-tool standard)
-saar extract ./my-repo
+saar extract .                        # generate AGENTS.md (default)
+saar extract . --format claude        # CLAUDE.md
+saar extract . --format cursorrules   # .cursorrules
+saar extract . --format all           # all four formats at once
+saar extract . --no-interview         # skip questions, use cache
+saar extract . --verbose              # no line cap, full output
+saar extract . --index                # also index into OCI for MCP search
 
-# generate specific formats
-saar extract ./my-repo --format claude          # CLAUDE.md
-saar extract ./my-repo --format cursorrules     # .cursorrules
-saar extract ./my-repo --format copilot         # copilot-instructions.md
-saar extract ./my-repo --format all             # all four
-
-# skip the interview (use cached answers or auto-detect only)
-saar extract ./my-repo --no-interview
-
-# add a correction without re-running analysis
-saar add "Never use sync functions in async endpoints"
-saar add --domain "Workspace = tenant, not a directory"
-saar add --off-limits "core/auth.py -- clock-skew workaround"
-saar add --verify "pytest -x && docker compose up && curl localhost:8000/health"
-
-# AI enrichment of raw answers via Claude
-saar enrich
-saar enrich --dry-run          # preview without saving
-saar extract . --enrich        # enrich inline during extraction
-
-# write to a specific directory
-saar extract ./my-repo -o ./docs/
-
-# overwrite existing files
-saar extract ./my-repo --force
-
-# exclude directories beyond defaults
-saar extract ./my-repo --exclude vendor legacy
+saar diff .                           # detect AGENTS.md staleness
+saar add "rule"                       # add correction without re-running
+saar enrich                           # polish raw answers with Claude AI
 ```
 
 ---
 
-## Preservation markers
+## Index into OCI for semantic search via MCP
 
-Generated files include markers that separate auto-detected content from anything you write manually:
+saar generates your AGENTS.md. [OpenCodeIntel (OCI)](https://opencodeintel.com) goes further — it indexes your codebase for per-task semantic search via MCP.
 
-```markdown
-<!-- SAAR:AUTO-START -->
-[auto-detected content -- updated on every re-run]
-<!-- SAAR:AUTO-END -->
-
-[your manual additions -- never touched]
+```bash
+saar extract . --index
 ```
 
-Re-running `saar extract` updates the auto section and leaves everything below the markers untouched. Add team-specific rules below the end marker -- they persist forever.
+Once indexed, every AI tool with the OCI MCP server gets a new power:
+
+```
+> codeintel:get_context_for_task("add rate limiting to the settings endpoints")
+
+## Context for: "add rate limiting to settings endpoints"
+
+### Relevant files
+- backend/routes/settings.py — settings endpoints (relevance: 94%)
+- backend/services/user_limits.py — existing rate limiting logic (87%)
+- backend/middleware/auth.py — require_auth pattern (81%)
+
+### Rules that apply
+- Use LimitCheckError, not a new exception class
+- Use require_auth decorator on all user endpoints
+- Never bypass RLS on the users table
+```
+
+**Before OCI:** Claude reads random files, guesses, gets it wrong.
+**After OCI:** Claude gets the exact 3 files and 3 rules for this specific task. First try.
+
+→ [Get started with OCI](https://opencodeintel.com) · [MCP setup guide](https://opencodeintel.com/docs/mcp)
 
 ---
 
-## Custom exclusions
+## What saar detects
 
-Create `.saarignore` in your repo root using the same syntax as `.gitignore`:
+**Python:** FastAPI / Flask / Django · Auth middleware and decorators · Service singletons · ORM + RLS · Exception hierarchy · Logging patterns · Naming conventions
 
-```
-# .saarignore
-vendor/
-legacy/
-generated/
-backend/repos/
-```
+**TypeScript/JS:** React / Next.js / Express · TanStack Query / SWR · Component patterns · Custom hooks (canonical example detection) · Common imports
 
-Saar already skips `node_modules/`, `venv/`, `dist/`, `build/`, `.git/`, and everything in `.gitignore`. `.saarignore` adds project-specific exclusions on top.
+**Dependency graph:** Critical files (most depended-on) · Circular dependencies · Canonical examples per category (hooks, services, components, tests)
 
----
+**Team rules:** Auto-includes CLAUDE.md, .cursorrules, AGENTS.md, CONVENTIONS.md if they exist
 
-## What it detects
-
-**From Python files:**
-- Framework (FastAPI, Flask, Django)
-- Auth patterns -- middleware, decorators, auth context type
-- Service architecture -- singletons, dependency injection, wiring file
-- Database -- ORM, primary key type, timestamps, Row Level Security, cascade deletes
-- Error handling -- exception class hierarchy, HTTP exception usage, logging on error
-- Logging -- logger import pattern, structured logging
-- Config -- env loading, settings pattern, secrets handling
-- Naming conventions -- function/class/constant/file style
-
-**From TypeScript/JavaScript files:**
-- Framework (Next.js, Express, React)
-- Function counting -- arrow functions, methods, declarations
-- Naming conventions -- camelCase vs PascalCase detection
-- Common imports -- top patterns across the codebase
-
-**From the dependency graph:**
-- Import resolution -- which files import which
-- Critical files -- highest dependent count (understand before editing)
-- Circular dependencies -- flagged explicitly
-- Impact analysis -- what breaks if you change a file
-
-**From team rules files:**
-- Auto-includes CLAUDE.md, .cursorrules, .codeintel/rules.md, CONVENTIONS.md, copilot-instructions.md
 
 ---
 
 ## Installation
 
 ```bash
-# recommended -- no venv needed
+# Recommended — no venv conflicts
 pipx install saar
 
-# or
+# Or standard
 pip install saar
+
+# With AI enrichment (optional)
+pip install saar[enrich]
+export ANTHROPIC_API_KEY=your-key
 ```
 
 Requires Python 3.10+.
 
-On Mac, use `pipx` to avoid the `externally-managed-environment` error.
-
 ---
 
-## Development
+## Contributing
+
+saar is MIT licensed and built in the open. Every commit, every decision, public.
 
 ```bash
 git clone https://github.com/OpenCodeIntel/saar.git
 cd saar
 python -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
-pytest tests/ -v
-ruff check saar/ tests/
+pytest tests/ -v          # 386 tests
+ruff check saar/ tests/   # lint
 ```
 
-AI enrichment requires `anthropic`:
-
-```bash
-pip install saar[enrich]
-export ANTHROPIC_API_KEY=your-key
-saar enrich
-```
+Good first issues are labeled [`good first issue`](https://github.com/OpenCodeIntel/saar/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) on GitHub.
 
 ---
 
-## License
+## Why open source?
 
-MIT. Built by [OpenCodeIntel](https://opencodeintel.com).
+AI context files contain your team's tribal knowledge — your domain vocabulary, your gotchas, your architecture decisions. That knowledge belongs to you, not to a $252M venture-backed company.
+
+- **Your code never leaves your machine** — saar runs entirely locally
+- **Works with every AI tool** — not locked to Claude, Cursor, or Copilot
+- **Inspect and modify everything** — MIT license, no black boxes
+- **Self-host OCI** — the semantic search layer is open source too
+
+> *"Bootstrapping context is not the challenge. Maintenance is."* — Packmind, Feb 2026
+
+saar is the only tool that solves both.
+
+---
+
+## Built by
+
+[Devanshu Chicholikar](https://github.com/DevanshuNEU) · MS Software Engineering, Northeastern University · Building [OpenCodeIntel](https://opencodeintel.com)
+
+---
+
+<div align="center">
+
+**[getsaar.com](https://getsaar.com)** · **[opencodeintel.com](https://opencodeintel.com)** · **[PyPI](https://pypi.org/project/saar/)** · **[MIT License](./LICENSE)**
+
+*If saar saved you time, a ⭐ on GitHub helps others find it.*
+
+</div>
