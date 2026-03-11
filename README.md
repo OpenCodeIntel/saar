@@ -51,6 +51,8 @@ That's it. No account. No API key. No config. Your code never leaves your machin
 
 ## One command. Then AI just gets it.
 
+![saar demo](saar_demo.gif)
+
 ```bash
 cd my-project
 saar extract .
