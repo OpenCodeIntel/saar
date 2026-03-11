@@ -209,8 +209,8 @@ def add(
     append_to_cache(repo_path, field, correction)
     console.print(f"  [green]added[/green] [{label}] {correction}")
     console.print(
-        f"  [dim]Saved to {repo_path / '.saar/config.json'}. "
-        f"Re-run [bold]saar .[/bold] to regenerate context files.[/dim]"
+        "  [dim]Saved to .saar/config.json. "
+        "Re-run [bold]saar .[/bold] to regenerate context files.[/dim]"
     )
 
 
@@ -419,7 +419,11 @@ def extract(
     if index:
         _run_oci_indexing(repo_path, console)
 
-    console.print("[bold green]done[/bold green]")
+    console.print()
+    console.print(
+        "  [bold green]Claude knows your project.[/bold green]"
+        "  [dim]Drop AGENTS.md in your repo root — it's picked up automatically.[/dim]"
+    )
 
 
 def _show_detection_summary(dna, console, no_interview: bool) -> bool:
@@ -583,9 +587,22 @@ def _write_with_markers(
     """
     wrapped = f"{_MARKER_START}\n{generated.rstrip()}\n{_MARKER_END}\n"
 
+    # Show relative path if inside cwd, otherwise just filename -- never full absolute path
+    def _display_path(p: Path) -> str:
+        try:
+            return str(p.relative_to(Path.cwd()))
+        except ValueError:
+            return p.name
+
+    def _line_count(text: str) -> int:
+        return len([ln for ln in text.splitlines() if ln.strip()])
+
     if not target.exists():
         target.write_text(wrapped, encoding="utf-8")
-        console.print(f"  [green]wrote[/green] {target}")
+        console.print(
+            f"  [green]wrote[/green] {_display_path(target)}"
+            f"  [dim]({_line_count(wrapped)} lines)[/dim]"
+        )
         return
 
     existing = target.read_text(encoding="utf-8")
@@ -593,7 +610,10 @@ def _write_with_markers(
     if force:
         # full overwrite -- discard everything including manual edits
         target.write_text(wrapped, encoding="utf-8")
-        console.print(f"  [green]overwrote[/green] {target}")
+        console.print(
+            f"  [green]wrote[/green] {_display_path(target)}"
+            f"  [dim]({_line_count(wrapped)} lines)[/dim]"
+        )
         return
 
     start_idx = existing.find(_MARKER_START)
@@ -603,7 +623,10 @@ def _write_with_markers(
         # No markers -- file exists but was written before markers were introduced
         # (or is purely hand-written). Treat it like first write: prepend auto block.
         target.write_text(wrapped + "\n" + existing, encoding="utf-8")
-        console.print(f"  [green]updated[/green] {target} (prepended auto block)")
+        console.print(
+            f"  [green]updated[/green] {_display_path(target)}"
+            f"  [dim]({_line_count(wrapped + existing)} lines)[/dim]"
+        )
         return
 
     # Splice: keep everything before the start marker and after the end marker.
@@ -618,8 +641,12 @@ def _write_with_markers(
     # Strip any orphaned SAAR markers from the preserved manual section.
     after = after.replace(_MARKER_START, "").replace(_MARKER_END, "")
 
-    target.write_text(before + wrapped + after, encoding="utf-8")
-    console.print(f"  [green]updated[/green] {target} (preserved manual edits)")
+    final = before + wrapped + after
+    target.write_text(final, encoding="utf-8")
+    console.print(
+        f"  [green]updated[/green] {_display_path(target)}"
+        f"  [dim]({_line_count(final)} lines, manual edits preserved)[/dim]"
+    )
 
 
 def _run_oci_indexing(repo_path: Path, console) -> None:
