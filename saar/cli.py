@@ -720,3 +720,349 @@ def _run_oci_indexing(repo_path: Path, console) -> None:
     except Exception as e:
         console.print(f"  [yellow]OCI indexing skipped:[/yellow] {e}")
         console.print("  AGENTS.md was still generated successfully.")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# saar stats
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.command()
+def stats(
+    repo_path: Path = typer.Argument(
+        Path("."),
+        help="Path to the repository. Defaults to current directory.",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+    ),
+    file: Optional[Path] = typer.Option(
+        None, "--file", "-f",
+        help="Path to specific context file (default: AGENTS.md in repo root).",
+    ),
+) -> None:
+    """Score your AGENTS.md quality: 0-100. See what's missing and why.
+
+    Examples:
+
+      saar stats
+
+      saar stats ./my-repo
+
+      saar stats --file ./CLAUDE.md
+    """
+    from saar.scorer import score_agents_md
+    from rich.table import Table
+    from rich import box
+
+    target_file = file or (repo_path / "AGENTS.md")
+
+    if not target_file.exists():
+        # try CLAUDE.md as fallback
+        fallback = repo_path / "CLAUDE.md"
+        if fallback.exists():
+            target_file = fallback
+        else:
+            console.print(
+                f"\n  [yellow]No AGENTS.md found in {repo_path.name}[/yellow]\n"
+                f"  Run [bold]saar extract .[/bold] to generate one.\n"
+            )
+            raise typer.Exit(code=1)
+
+    result = score_agents_md(target_file, repo_path)
+
+    # ── Score banner ────────────────────────────────────────────────────────
+    score = result.total_score
+    grade = result.grade
+
+    if score >= 85:
+        score_color = "green"
+        verdict = "Excellent -- AI will follow this well"
+    elif score >= 70:
+        score_color = "cyan"
+        verdict = "Good -- a few improvements would help"
+    elif score >= 50:
+        score_color = "yellow"
+        verdict = "Needs work -- missing key sections"
+    else:
+        score_color = "red"
+        verdict = "Poor -- AI will likely ignore this"
+
+    console.print()
+    console.print(
+        f"  [bold]saar stats[/bold] — [cyan]{target_file.name}[/cyan]  "
+        f"[{score_color}][bold]{score}/100[/bold][/{score_color}]  "
+        f"[dim]({grade})[/dim]"
+    )
+    console.print(f"  [dim]{verdict}[/dim]")
+    console.print()
+
+    # ── Score bar ───────────────────────────────────────────────────────────
+    filled = round(score / 5)   # 20 blocks total
+    empty = 20 - filled
+    bar_color = score_color
+    bar = f"  [{bar_color}]{'█' * filled}[/{bar_color}][dim]{'░' * empty}[/dim]  {score}/100"
+    console.print(bar)
+    console.print()
+
+    # ── Breakdown table ─────────────────────────────────────────────────────
+    table = Table(show_header=True, box=box.SIMPLE, padding=(0, 2))
+    table.add_column("Category", style="dim", width=20)
+    table.add_column("Score", width=10)
+    table.add_column("Max", width=6, style="dim")
+    table.add_column("", width=30)
+
+    def _pts_fmt(earned: int, max_pts: int) -> str:
+        if earned == max_pts:
+            return f"[green]{earned}[/green]"
+        if earned >= max_pts * 0.6:
+            return f"[yellow]{earned}[/yellow]"
+        return f"[red]{earned}[/red]"
+
+    table.add_row(
+        "Size",
+        _pts_fmt(result.size_score, 20),
+        "20",
+        f"[dim]{result.line_count} lines[/dim]"
+    )
+    table.add_row(
+        "Freshness",
+        _pts_fmt(result.freshness_score, 20),
+        "20",
+        f"[dim]{'never indexed' if result.freshness_days is None else (str(result.freshness_days) + ' days ago')}[/dim]"
+    )
+    table.add_row(
+        "Coverage",
+        _pts_fmt(result.coverage_score, 40),
+        "40",
+        f"[dim]{6 - len(result.missing_sections)}/6 sections present[/dim]"
+    )
+    table.add_row(
+        "Precision",
+        _pts_fmt(result.precision_score, 20),
+        "20",
+        f"[dim]{len(result.generic_lines)} generic lines found[/dim]"
+    )
+
+    console.print(table)
+
+    # ── Section coverage ────────────────────────────────────────────────────
+    console.print("  [bold]Sections[/bold]")
+    for ss in result.section_scores:
+        icon = "[green]✓[/green]" if ss.present else "[red]✗[/red]"
+        name = ss.name
+        pts = f"[dim]+{ss.points_max}pts[/dim]" if ss.present else "[dim]missing[/dim]"
+        console.print(f"    {icon}  {name:<30} {pts}")
+
+    console.print()
+
+    # ── Tips ─────────────────────────────────────────────────────────────────
+    if result.tips:
+        console.print("  [bold]How to improve[/bold]")
+        for i, tip in enumerate(result.tips[:5], 1):
+            console.print(f"    [dim]{i}.[/dim] {tip}")
+        if len(result.tips) > 5:
+            console.print(f"    [dim]... and {len(result.tips) - 5} more[/dim]")
+    else:
+        console.print("  [green]No improvements needed -- this is a great context file![/green]")
+
+    console.print()
+
+    # Share prompt for high scores
+    if score >= 80:
+        console.print(
+            f"  [dim]Share it: \"My AGENTS.md scored {score}/100 with saar — getsaar.com\"[/dim]"
+        )
+        console.print()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# saar init
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.command(name="init")
+def init_cmd(
+    repo_path: Path = typer.Argument(
+        Path("."),
+        help="Path to the new project directory. Defaults to current directory.",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+    ),
+    force: bool = typer.Option(
+        False, "--force",
+        help="Overwrite existing AGENTS.md.",
+    ),
+) -> None:
+    """Bootstrap a new project's AGENTS.md before you have any code.
+
+    Perfect for: new repos, hackathons, course projects, or any fresh start.
+    Asks 5 quick questions, generates a solid starting point in 60 seconds.
+
+    Examples:
+
+      saar init
+
+      saar init ./my-new-saas
+    """
+    from saar.init_wizard import run_init_interview, render_init_agents_md
+
+    target = repo_path / "AGENTS.md"
+
+    if target.exists() and not force:
+        console.print(
+            f"\n  [yellow]AGENTS.md already exists[/yellow] in {repo_path.name}\n"
+            f"  Use [bold]saar extract .[/bold] to update it from your code.\n"
+            f"  Or use [bold]--force[/bold] to overwrite.\n"
+        )
+        raise typer.Exit(code=0)
+
+    console.print()
+    console.print(f"  [bold]saar init[/bold] — new project setup for [cyan]{repo_path.name}[/cyan]")
+    console.print("  [dim]5 quick questions. 60 seconds. Claude will know your project.[/dim]")
+    console.print()
+
+    answers = run_init_interview(console)
+
+    if answers is None:
+        console.print("[dim]Cancelled.[/dim]")
+        raise typer.Exit(code=0)
+
+    content = render_init_agents_md(answers, repo_path.name)
+    target.write_text(content, encoding="utf-8")
+
+    line_count = len(content.splitlines())
+    console.print()
+    console.print(f"  [green]wrote[/green] {target}  ({line_count} lines)")
+    console.print()
+    console.print("  [bold]Next steps:[/bold]")
+    console.print("  [dim]1.[/dim] Drop this in your repo root — Claude Code + Cursor pick it up automatically")
+    console.print("  [dim]2.[/dim] Once you write code: [bold]saar extract .[/bold] to auto-detect your conventions")
+    console.print("  [dim]3.[/dim] Add corrections anytime: [bold]saar add 'your rule here'[/bold]")
+    console.print()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# saar scan
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.command()
+def scan(
+    target: str = typer.Argument(
+        ...,
+        help="GitHub URL or local path to scan.",
+    ),
+    no_interview: bool = typer.Option(
+        True, "--interview/--no-interview",
+        help="Run interview (default: skip for scan).",
+    ),
+    index: bool = typer.Option(
+        False, "--index",
+        help="Index into OCI after scanning.",
+    ),
+) -> None:
+    """Scan any GitHub repo URL without cloning it manually.
+
+    Shows what saar detects — stack, auth, exceptions, conventions.
+    Great for exploring open source repos or demoing saar.
+
+    Examples:
+
+      saar scan https://github.com/tiangolo/fastapi
+
+      saar scan https://github.com/pallets/flask
+
+      saar scan https://github.com/yourusername/your-repo
+    """
+    import tempfile
+    import subprocess
+
+    # -- detect if it's a URL or local path --
+    is_url = target.startswith("https://") or target.startswith("git@")
+
+    if is_url:
+        console.print()
+        console.print(f"  [bold]saar scan[/bold] — [cyan]{target}[/cyan]")
+        console.print("  [dim]Cloning and scanning...[/dim]")
+        console.print()
+
+        with tempfile.TemporaryDirectory(prefix="saar_scan_") as tmpdir:
+            tmp_path = Path(tmpdir) / "repo"
+
+            # shallow clone -- fast
+            try:
+                result = subprocess.run(
+                    ["git", "clone", "--depth=1", "--quiet", target, str(tmp_path)],
+                    capture_output=True, text=True, timeout=60,
+                )
+                if result.returncode != 0:
+                    console.print(f"  [red]Clone failed:[/red] {result.stderr.strip()}")
+                    raise typer.Exit(code=1)
+            except subprocess.TimeoutExpired:
+                console.print("  [red]Clone timed out (60s). Try cloning manually first.[/red]")
+                raise typer.Exit(code=1)
+            except FileNotFoundError:
+                console.print("  [red]git not found. Install git and try again.[/red]")
+                raise typer.Exit(code=1)
+
+            _run_scan(tmp_path, no_interview=True, index=index)
+    else:
+        local = Path(target).resolve()
+        if not local.exists():
+            console.print(f"  [red]Path not found:[/red] {target}")
+            raise typer.Exit(code=1)
+        console.print()
+        console.print(f"  [bold]saar scan[/bold] — [cyan]{local.name}[/cyan]")
+        console.print()
+        _run_scan(local, no_interview=no_interview, index=index)
+
+
+def _run_scan(repo_path: Path, no_interview: bool = True, index: bool = False) -> None:
+    """Internal: run extraction + show stats on a path (used by scan command)."""
+    from saar.extractor import DNAExtractor
+    from saar.scorer import score_agents_md
+
+    extractor = DNAExtractor()
+    dna = extractor.extract(str(repo_path))
+
+    if dna is None:
+        console.print("  [red]Could not analyze this repository.[/red]")
+        return
+
+    # Show detection summary
+    _show_detection_summary(dna, console, no_interview=True)
+
+    # Generate AGENTS.md to a temp file and score it
+    import tempfile
+    from saar.formatters import render
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, encoding="utf-8"
+    ) as tmp:
+        tmp.write(render(dna, "agents", budget=100))
+        tmp_path = Path(tmp.name)
+
+    result = score_agents_md(tmp_path, repo_path)
+    tmp_path.unlink(missing_ok=True)
+
+    score = result.total_score
+    if score >= 85:
+        color = "green"
+    elif score >= 60:
+        color = "yellow"
+    else:
+        color = "red"
+
+    console.print(
+        f"  Estimated AGENTS.md quality: "
+        f"[{color}][bold]{score}/100[/bold][/{color}]"
+    )
+
+    if result.missing_sections:
+        console.print(
+            f"  [dim]Missing: {', '.join(result.missing_sections)}[/dim]"
+        )
+
+    console.print()
+    console.print(
+        "  To generate AGENTS.md for your own project: "
+        "[bold]pip install saar && saar extract .[/bold]"
+    )
+
+    if index:
+        _run_oci_indexing(repo_path, console)
