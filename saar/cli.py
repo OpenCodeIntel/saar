@@ -54,6 +54,7 @@ class OutputFormat(str, Enum):
     markdown = "markdown"
     claude = "claude"
     cursorrules = "cursorrules"
+    cursor_mdc = "cursor-mdc"   # Cursor v2 -- .cursor/rules/*.mdc with glob loading
     copilot = "copilot"
     all = "all"
 
@@ -341,6 +342,7 @@ def extract(
             OutputFormat.agents,
             OutputFormat.claude,
             OutputFormat.cursorrules,
+            OutputFormat.cursor_mdc,
             OutputFormat.copilot,
         ]
     else:
@@ -407,6 +409,11 @@ def extract(
     from saar.formatters import render
 
     for fmt in target_formats:
+        # cursor_mdc is a multi-file format -- special handling
+        if fmt == OutputFormat.cursor_mdc:
+            _write_cursor_mdc(dna, output or repo_path, force=force, console=console)
+            continue
+
         text = render(dna, fmt.value, budget=effective_budget)
         target = _resolve_output_path(fmt, output, repo_path)
 
@@ -568,6 +575,51 @@ def _show_detection_summary(dna, console, no_interview: bool) -> bool:
         return True
 
 
+def _write_cursor_mdc(dna, base_dir: Path, *, force: bool, console: Console) -> None:
+    """Write .cursor/rules/*.mdc files for Cursor v2 format (OPE-143).
+
+    Why separate from _write_with_markers:
+      .mdc files are generated in a directory, not a single file.
+      They don't use SAAR markers -- they're fully regenerated each time
+      because Cursor manages them as a set. Existing .mdc files written
+      by saar are always overwritten; hand-crafted ones are skipped (OPE-181).
+    """
+    from saar.formatters.cursor_mdc import render_cursor_mdc
+
+    rules_dir = base_dir / ".cursor" / "rules"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+
+    mdc_files = render_cursor_mdc(dna)
+    if not mdc_files:
+        return
+
+    written = []
+    skipped = []
+    for filename, content in mdc_files.items():
+        target = rules_dir / filename
+        if target.exists() and not force:
+            # check if it's saar-generated (has our frontmatter signature)
+            existing = target.read_text(encoding="utf-8")
+            is_ours = "alwaysApply:" in existing  # saar always writes this field
+            if not is_ours:
+                skipped.append(filename)
+                continue
+        target.write_text(content, encoding="utf-8")
+        written.append(filename)
+
+    if written:
+        files_str = ", ".join(written)
+        console.print(
+            f"  [green]wrote[/green] .cursor/rules/  "
+            f"[dim]({files_str})[/dim]"
+        )
+    if skipped:
+        console.print(
+            f"  [yellow]skipped[/yellow] .cursor/rules/{skipped[0]}  "
+            f"[dim](hand-crafted — use --force to overwrite)[/dim]"
+        )
+
+
 def _detect_ai_tools(repo_path: Path) -> list[OutputFormat]:
     """Detect which AI tools are present in the repo and return matching formats.
 
@@ -585,9 +637,11 @@ def _detect_ai_tools(repo_path: Path) -> list[OutputFormat]:
     """
     detected: list[OutputFormat] = []
 
-    # Cursor -- check for .cursor/ dir (Cursor v2 workspace) or legacy .cursorrules
-    if (repo_path / ".cursor").is_dir() or (repo_path / ".cursorrules").exists():
-        detected.append(OutputFormat.cursorrules)
+    # Cursor -- prefer .mdc (v2) when .cursor/ dir exists, fall back to flat .cursorrules
+    if (repo_path / ".cursor").is_dir():
+        detected.append(OutputFormat.cursor_mdc)   # .cursor/rules/*.mdc files
+    elif (repo_path / ".cursorrules").exists():
+        detected.append(OutputFormat.cursorrules)   # legacy flat file
 
     # Claude Code -- CLAUDE.md already present means user wants it maintained
     if (repo_path / "CLAUDE.md").exists():

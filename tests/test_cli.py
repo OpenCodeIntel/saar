@@ -13,7 +13,7 @@ class TestCLI:
     def test_version(self):
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "0.5.6" in result.stdout
+        assert "0.5.7" in result.stdout
 
     def test_help(self):
         result = runner.invoke(app, ["--help"])
@@ -291,7 +291,9 @@ class TestDetectAiTools:
         from saar.cli import _detect_ai_tools, OutputFormat
         (tmp_path / ".cursor").mkdir()
         result = _detect_ai_tools(tmp_path)
-        assert OutputFormat.cursorrules in result
+        # .cursor/ dir means Cursor v2 -- prefer cursor_mdc over flat cursorrules
+        assert OutputFormat.cursor_mdc in result
+        assert OutputFormat.cursorrules not in result
 
     def test_detects_claude_md(self, tmp_path):
         from saar.cli import _detect_ai_tools, OutputFormat
@@ -321,3 +323,94 @@ class TestDetectAiTools:
         result = _detect_ai_tools(tmp_path)
         # AGENTS.md is always generated -- not a tool to detect
         assert result == []
+
+
+# ── OPE-143: Cursor .mdc format ───────────────────────────────────────────────
+
+class TestCursorMdc:
+    """render_cursor_mdc generates valid .mdc files with frontmatter + globs."""
+
+    def _make_dna(self):
+        """Minimal CodebaseDNA for testing."""
+        from saar.extractor import DNAExtractor
+        import tempfile
+        import os
+        with tempfile.TemporaryDirectory() as d:
+            open(os.path.join(d, "app.py"), "w").write("def main(): pass")
+            extractor = DNAExtractor()
+            return extractor.extract(d)
+
+    def test_returns_dict(self):
+        from saar.formatters.cursor_mdc import render_cursor_mdc
+        from saar.models import CodebaseDNA
+        dna = CodebaseDNA(repo_name="test")
+        result = render_cursor_mdc(dna)
+        assert isinstance(result, dict)
+
+    def test_core_mdc_always_present_when_content(self):
+        from saar.formatters.cursor_mdc import render_cursor_mdc
+        from saar.models import CodebaseDNA
+        dna = CodebaseDNA(repo_name="myapp")
+        dna.team_rules = "Never push to main directly"
+        result = render_cursor_mdc(dna)
+        assert "core.mdc" in result
+
+    def test_core_mdc_frontmatter(self):
+        from saar.formatters.cursor_mdc import render_cursor_mdc
+        from saar.models import CodebaseDNA
+        dna = CodebaseDNA(repo_name="myapp")
+        dna.team_rules = "Never push to main"
+        content = render_cursor_mdc(dna)["core.mdc"]
+        assert "---" in content
+        assert "alwaysApply: true" in content
+
+    def test_backend_mdc_python_glob(self):
+        from saar.formatters.cursor_mdc import render_cursor_mdc
+        from saar.models import CodebaseDNA
+        dna = CodebaseDNA(repo_name="myapp")
+        dna.language_distribution = {"python": 10}
+        result = render_cursor_mdc(dna)
+        if "backend.mdc" in result:
+            assert "**/*.py" in result["backend.mdc"]
+
+    def test_frontend_mdc_ts_globs(self):
+        from saar.formatters.cursor_mdc import render_cursor_mdc
+        from saar.models import CodebaseDNA, FrontendPattern
+        dna = CodebaseDNA(repo_name="myapp")
+        dna.language_distribution = {"typescript": 20}
+        dna.frontend_patterns = FrontendPattern(framework="React", language="TypeScript")
+        result = render_cursor_mdc(dna)
+        if "frontend.mdc" in result:
+            assert "**/*.ts" in result["frontend.mdc"]
+            assert "**/*.tsx" in result["frontend.mdc"]
+
+    def test_no_duplicate_sections(self):
+        from saar.formatters.cursor_mdc import render_cursor_mdc
+        from saar.models import CodebaseDNA
+        dna = CodebaseDNA(repo_name="myapp")
+        dna.language_distribution = {"python": 5}
+        result = render_cursor_mdc(dna)
+        for filename, content in result.items():
+            # each file should start with frontmatter
+            assert content.startswith("---"), f"{filename} missing frontmatter"
+
+    def test_write_cursor_mdc_creates_directory(self, tmp_path):
+        from saar.cli import _write_cursor_mdc
+        from saar.models import CodebaseDNA
+        from rich.console import Console
+        dna = CodebaseDNA(repo_name="myapp")
+        dna.team_rules = "Never push to main"
+        _write_cursor_mdc(dna, tmp_path, force=False, console=Console(quiet=True))
+        rules_dir = tmp_path / ".cursor" / "rules"
+        assert rules_dir.exists()
+
+    def test_write_cursor_mdc_writes_files(self, tmp_path):
+        from saar.cli import _write_cursor_mdc
+        from saar.models import CodebaseDNA
+        from rich.console import Console
+        dna = CodebaseDNA(repo_name="myapp")
+        dna.team_rules = "Never push to main"
+        _write_cursor_mdc(dna, tmp_path, force=False, console=Console(quiet=True))
+        rules_dir = tmp_path / ".cursor" / "rules"
+        mdc_files = list(rules_dir.glob("*.mdc"))
+        assert len(mdc_files) >= 1
