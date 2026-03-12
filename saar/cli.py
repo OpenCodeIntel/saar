@@ -845,6 +845,7 @@ def stats(
     # ── Score banner ────────────────────────────────────────────────────────
     score = result.total_score
     grade = result.grade
+    project_type = result.project_type
 
     if score >= 85:
         score_color = "green"
@@ -859,11 +860,16 @@ def stats(
         score_color = "red"
         verdict = "Poor -- AI will likely ignore this"
 
+    # show project type in dim when it's non-default (affects which sections matter)
+    type_hint = ""
+    if project_type in ("library", "cli"):
+        type_hint = f"  [dim]({project_type} — auth/exceptions not required)[/dim]"
+
     console.print()
     console.print(
         f"  [bold]saar stats[/bold] — [cyan]{target_file.name}[/cyan]  "
         f"[{score_color}][bold]{score}/100[/bold][/{score_color}]  "
-        f"[dim]({grade})[/dim]"
+        f"[dim]({grade})[/dim]{type_hint}"
     )
     console.print(f"  [dim]{verdict}[/dim]")
     console.print()
@@ -904,9 +910,9 @@ def stats(
     )
     table.add_row(
         "Coverage",
-        _pts_fmt(result.coverage_score, 40),
-        "40",
-        f"[dim]{6 - len(result.missing_sections)}/6 sections present[/dim]"
+        _pts_fmt(result.coverage_score, result.coverage_max),
+        str(result.coverage_max),
+        f"[dim]{sum(1 for s in result.section_scores if s.present)}/{len(result.section_scores)} sections present[/dim]"
     )
     table.add_row(
         "Precision",

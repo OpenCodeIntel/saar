@@ -58,18 +58,18 @@ Workspace = tenant
 
 Stack: FastAPI Python
 """
-        score, sections, missing = _score_coverage(content)
+        score, sections, missing, _ = _score_coverage(content)
         assert score >= 30
         assert len(missing) < 3
 
     def test_empty_file_zero_coverage(self):
-        score, sections, missing = _score_coverage("")
+        score, sections, missing, _ = _score_coverage("")
         assert score == 0
         assert len(missing) == 6
 
     def test_partial_coverage(self):
         content = "never use npm\npytest tests/"
-        score, sections, missing = _score_coverage(content)
+        score, sections, missing, _ = _score_coverage(content)
         assert 0 < score < 40
 
 

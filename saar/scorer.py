@@ -71,6 +71,67 @@ _EXPECTED_SECTIONS = {
     ),
 }
 
+# ── Project type detection ─────────────────────────────────────────────────────
+# Libraries and CLIs should not be penalized for missing auth/exception sections.
+
+_WEB_APP_SIGNALS = [
+    "fastapi", "django", "flask", "express", "nestjs", "next.js",
+    "endpoints", "api routes", "middleware", "rest api", "graphql",
+    "require_auth", "login", "jwt", "session", "database", "orm",
+]
+_LIBRARY_SIGNALS = [
+    "component library", "sdk", "plugin", "addon", "npm package",
+    "pypi", "peer dep", "peerdependencies", "consumers", "published as",
+]
+_CLI_SIGNALS = [
+    "cli", "command line", "command-line", "typer", "click", "argparse",
+    "subcommand", "bin/",
+]
+
+
+def _detect_project_type(content: str, repo_path: Optional["Path"] = None) -> str:
+    """Infer project type: 'web_app' | 'library' | 'cli' | 'unknown'."""
+    lowered = content.lower()
+
+    if repo_path is not None:
+        try:
+            import json as _json
+            pkg = repo_path / "package.json"
+            if pkg.exists():
+                data = _json.loads(pkg.read_text(encoding="utf-8"))
+                name = data.get("name", "")
+                scripts = data.get("scripts", {})
+                has_start = bool(scripts.get("start") or scripts.get("serve"))
+                has_exports = bool(data.get("main") or data.get("exports") or data.get("module"))
+                is_scoped = name.startswith("@")  # e.g. @storybook/..., @babel/...
+
+                if data.get("bin"):
+                    return "cli"
+                # library: scoped package, or has exports but no start script
+                if (is_scoped and not has_start) or (has_exports and not has_start):
+                    return "library"
+        except Exception:
+            pass
+
+    lib_score = sum(1 for s in _LIBRARY_SIGNALS if s in lowered)
+    web_score = sum(1 for s in _WEB_APP_SIGNALS if s in lowered)
+    cli_score = sum(1 for s in _CLI_SIGNALS if s in lowered)
+
+    if lib_score >= 2 and lib_score > web_score:
+        return "library"
+    if web_score >= 2:
+        return "web_app"
+    # only classify as cli from content if very strong signal and no web evidence
+    if cli_score >= 3 and web_score == 0:
+        return "cli"
+    return "unknown"
+
+
+# Rubrics: library/cli skip auth + exceptions (irrelevant for them)
+_SECTIONS_LIBRARY = {k: v for k, v in _EXPECTED_SECTIONS.items()
+                     if k not in ("auth", "exceptions")}
+_SECTIONS_CLI = _SECTIONS_LIBRARY
+
 
 @dataclass
 class SectionScore:
@@ -97,6 +158,8 @@ class StatsResult:
     generic_lines: list[str] = field(default_factory=list)
     missing_sections: list[str] = field(default_factory=list)
     tips: list[str] = field(default_factory=list)
+    project_type: str = "unknown"
+    coverage_max: int = 40   # 40 for web_app, 28 for library/cli
 
 
 def _grade(score: int) -> str:
@@ -159,14 +222,31 @@ def _score_freshness(repo_path: Path) -> tuple[int, Optional[int], Optional[str]
         return 10, None, None
 
 
-def _score_coverage(content: str) -> tuple[int, list[SectionScore], list[str]]:
-    """Score based on which sections are present."""
+
+def _score_coverage(
+    content: str,
+    repo_path: Optional[Path] = None,
+) -> tuple[int, list[SectionScore], list[str], str]:
+    """Score based on which sections are present.
+
+    Returns (score, section_scores, missing_sections, project_type).
+    Uses project-type-aware rubric so libraries/CLIs aren't penalized
+    for missing auth/exception sections (irrelevant for them).
+    """
     content_lower = content.lower()
+    project_type = _detect_project_type(content, repo_path)
+
+    # pick the right rubric
+    if project_type in ("library", "cli"):
+        rubric = _SECTIONS_LIBRARY
+    else:
+        rubric = _EXPECTED_SECTIONS  # web_app or unknown -- full rubric
+
     section_scores = []
     missing = []
     total = 0
 
-    for key, (keywords, label, max_pts) in _EXPECTED_SECTIONS.items():
+    for key, (keywords, label, max_pts) in rubric.items():
         present = any(kw in content_lower for kw in keywords)
         earned = max_pts if present else 0
         tip = None if present else f"Add {label.lower()} -- use `saar add` or re-run `saar extract .`"
@@ -174,6 +254,8 @@ def _score_coverage(content: str) -> tuple[int, list[SectionScore], list[str]]:
         total += earned
         if not present:
             missing.append(label)
+
+    return total, section_scores, missing, project_type
 
     return total, section_scores, missing
 
@@ -223,7 +305,7 @@ def score_agents_md(agents_path: Path, repo_path: Optional[Path] = None) -> Stat
     _repo = repo_path or agents_path.parent
     freshness_score, days_old, freshness_tip = _score_freshness(_repo)
 
-    coverage_score, section_scores, missing = _score_coverage(content)
+    coverage_score, section_scores, missing, project_type = _score_coverage(content, _repo)
 
     precision_score, generic_lines = _score_precision(content, lines)
 
@@ -254,4 +336,8 @@ def score_agents_md(agents_path: Path, repo_path: Optional[Path] = None) -> Stat
         generic_lines=generic_lines,
         missing_sections=missing,
         tips=tips,
+        project_type=project_type,
+        coverage_max=sum(v[2] for v in (
+            _SECTIONS_LIBRARY if project_type in ("library", "cli") else _EXPECTED_SECTIONS
+        ).values()),
     )
