@@ -530,6 +530,11 @@ def _show_detection_summary(dna, console, no_interview: bool) -> bool:
         table.add_row(label, f"[cyan]{value}[/cyan]")
 
     console.print(table)
+
+    # show analysis warnings (file limit, recursion skips, etc.) -- OPE-182
+    for warning in getattr(dna, "analysis_warnings", []):
+        console.print(f"  [yellow]⚠[/yellow]  [dim]{warning}[/dim]")
+
     console.print()
 
     if not interactive:

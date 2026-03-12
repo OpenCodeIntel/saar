@@ -87,7 +87,7 @@ class DNAExtractor:
     }
 
     MAX_FILE_SIZE = 1024 * 1024  # 1MB
-    MAX_FILES = 10000  # raised -- large monorepos can have many files after exclusions
+    MAX_FILES = 25000  # generous limit -- PostHog has 19K, most repos <10K
 
     RULES_FILES = [
         "CLAUDE.md",
@@ -117,6 +117,7 @@ class DNAExtractor:
         self._file_cache: Dict[Path, str] = {}
         self._stats = {"files_read": 0, "files_skipped": 0, "read_errors": 0}
         self._active_skip_dirs = set(self.SKIP_DIRS)
+        self._file_limit_hit = False  # set True when MAX_FILES cap is reached
 
     # -- file I/O ---------------------------------------------------------
 
@@ -222,6 +223,8 @@ class DNAExtractor:
                         continue
                     total = len(app_files) + len(test_files)
                     if total >= self.MAX_FILES:
+                        # Store hit count on self so CLI can warn user
+                        self._file_limit_hit = True
                         logger.warning("Hit max file limit (%d)", self.MAX_FILES)
                         break
                     if self._is_test_file(item):
@@ -1395,6 +1398,16 @@ class DNAExtractor:
             "DNA extraction complete: %.2fs, %d files read, %d skipped",
             elapsed, self._stats["files_read"], self._stats["files_skipped"],
         )
+
+        # surface file limit warning directly on DNA (OPE-182)
+        if self._file_limit_hit:
+            total_files = len(app_files) + len(test_files)
+            dna.analysis_warnings.append(
+                f"Large repo: analysed {total_files:,} files (cap={self.MAX_FILES:,}). "
+                "Some files may be missing from critical-files and exception detection. "
+                "Use --exclude to focus on specific directories."
+            )
+
         return dna
 
     def _enrich_with_style(self, dna: CodebaseDNA, repo_path: str) -> None:

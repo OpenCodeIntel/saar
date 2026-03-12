@@ -224,7 +224,22 @@ def render_agents_md(dna: CodebaseDNA) -> str:
     if ep.exception_classes or ep.http_exception_usage or ep.logging_on_error:
         lines.append("\n## Error Handling\n")
         if ep.exception_classes:
-            lines.append(f"- Use domain exceptions: `{', '.join(ep.exception_classes)}`")
+            all_exc = ep.exception_classes
+            total = len(all_exc)
+            if total <= 10:
+                # few enough -- list them all inline
+                lines.append(f"- Use domain exceptions: `{', '.join(all_exc)}`")
+            else:
+                # too many to list -- show top 10 + search hint (OPE-183)
+                top = all_exc[:10]
+                lines.append(
+                    f"- Use domain exceptions ({total} total). Most common: "
+                    f"`{', '.join(top)}`"
+                )
+                lines.append(
+                    "- Never create new exception classes without checking: "
+                    "`grep -r 'class.*Error\\|class.*Exception' . --include='*.py' -l`"
+                )
         if ep.http_exception_usage:
             lines.append("- Use HTTPException for API errors")
         if ep.logging_on_error:

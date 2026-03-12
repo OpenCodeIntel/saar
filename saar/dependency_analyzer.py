@@ -135,6 +135,9 @@ class DependencyAnalyzer:
                 "language": language,
                 "import_count": len(imports),
             }
+        except RecursionError:
+            logger.warning("Skipped %s (recursion limit -- file too complex)", file_path)
+            return {"file": file_path, "imports": [], "language": language}
         except Exception as e:
             logger.error("Error analyzing %s: %s", file_path, e)
             return {"file": file_path, "imports": [], "language": language}
