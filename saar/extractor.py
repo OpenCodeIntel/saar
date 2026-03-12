@@ -60,12 +60,20 @@ class DNAExtractor:
         "node_modules", ".next", ".nuxt", ".svelte-kit",
         # build outputs
         "dist", "build", "out", "target",
+        # compiled/vendored assets -- never source code (OPE-184)
+        "compiled", "bundles", "vendor", "vendors",
         # test/coverage artifacts
         "coverage", ".pytest_cache", "htmlcov", ".nyc_output",
         # cloned repo dirs (the specific OCI case)
         "repos",
         # ide
         ".idea", ".vscode",
+        # example/demo apps -- not the primary project (OPE-185)
+        # These directories contain demo applications that use different stacks.
+        # Scanning them produces false positives (Express in a React Native lib,
+        # shadcn/ui in the Next.js framework repo itself, etc.)
+        "examples", "example", "demo", "demos", "playground", "playgrounds",
+        "starters", "templates", "fixtures", "test-fixtures",
     }
 
     # file suffixes that are never source code -- skip regardless of directory
@@ -302,7 +310,7 @@ class DNAExtractor:
             "flask": [r"^from flask\b", r"^import flask\b"],
         }
         js_indicators = {
-            "express": [r"^const\s+\w+\s*=\s*require\("],
+            "express": [r"require\(['\"]express['\"]\)", r"from ['\"]express['\"]"],
             "nextjs": [r"^import\s+.*from\s+.next/"],
             "nestjs": [r"^import\s+.*from\s+.@nestjs/"],
         }
