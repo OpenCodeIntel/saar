@@ -49,7 +49,8 @@ _EXPECTED_SECTIONS = {
         8,
     ),
     "auth": (
-        ["auth", "authentication", "require_auth", "login", "jwt", "token", "security"],
+        ["## auth", "auth pattern", "require_auth", "jwt", "@useguards", "authguard",
+         "auth middleware", "auth decorator", "authentication:", "auth:"],
         "Auth patterns",
         6,
     ),

@@ -275,6 +275,17 @@ def render_agents_md(dna: CodebaseDNA) -> str:
             lines.append("\n## Project-Specific Rules\n")
             if dna.team_rules_source:
                 lines.append(f"*From `{dna.team_rules_source}`*\n")
-            lines.append(cleaned)
+            # Cap team rules at 40 lines -- prevents a huge existing CLAUDE.md
+            # from blowing the budget. The most important rules are at the top.
+            rule_lines = cleaned.splitlines()
+            if len(rule_lines) > 40:
+                trimmed = "\n".join(rule_lines[:40])
+                lines.append(trimmed)
+                lines.append(
+                    f"\n*[{len(rule_lines) - 40} lines omitted -- "
+                    f"run `saar extract --verbose` for full rules]*"
+                )
+            else:
+                lines.append(cleaned)
 
     return "\n".join(lines) + "\n"
