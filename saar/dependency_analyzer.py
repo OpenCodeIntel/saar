@@ -122,7 +122,18 @@ class DependencyAnalyzer:
 
         try:
             source = Path(file_path).read_bytes()
-            tree = self.parsers[language].parse(source)
+            # Suppress stderr during tree-sitter parsing -- some large/complex files
+            # cause tree-sitter to print internal warnings we can't control otherwise
+            import os as _os
+            import sys as _sys
+            _devnull = open(_os.devnull, "w")
+            _old_stderr = _sys.stderr
+            _sys.stderr = _devnull
+            try:
+                tree = self.parsers[language].parse(source)
+            finally:
+                _sys.stderr = _old_stderr
+                _devnull.close()
 
             if language == "python":
                 imports = self._extract_python_imports(tree.root_node, source)

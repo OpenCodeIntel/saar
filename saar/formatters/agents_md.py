@@ -187,10 +187,25 @@ def render_agents_md(dna: CodebaseDNA) -> str:
         lines.append("\n## Project Structure\n")
         lines.append(dna.project_structure)
 
-    # -- architecture --
+    # -- architecture + deep rules (OPE-96) --
+    # When deep_rules exist, use them instead of bare labels.
+    # Deep rules are full sentences with evidence and reasoning.
+    # Fall back to label-based output when deep extraction found nothing.
     sp = dna.service_patterns
     ap = dna.auth_patterns
-    if sp.singleton_services or sp.dependencies_file or ap.middleware_used or ap.auth_decorators:
+    deep_rules = getattr(dna, "deep_rules", [])
+    deep_by_category: dict = {}
+    for r in deep_rules:
+        cat = r.get("category", "general")
+        deep_by_category.setdefault(cat, []).append(r)
+
+    # Auth section -- prefer deep rules over labels
+    auth_deep = deep_by_category.get("auth", [])
+    if auth_deep:
+        lines.append("\n## Auth\n")
+        for rule in auth_deep[:3]:
+            lines.append(f"- {rule['text']}")
+    elif sp.singleton_services or sp.dependencies_file or ap.middleware_used or ap.auth_decorators:
         lines.append("\n## Architecture\n")
         if sp.singleton_services:
             lines.append(f"- Services are singletons: `{', '.join(sp.singleton_services)}`")
@@ -245,8 +260,9 @@ def render_agents_md(dna: CodebaseDNA) -> str:
         if ep.logging_on_error:
             lines.append("- Log exceptions before re-raising")
 
-    # -- testing --
+    # -- testing -- prefer deep rules over bare labels
     tp = dna.test_patterns
+    testing_deep = deep_by_category.get("testing", [])
     if tp.framework:
         lines.append("\n## Testing\n")
         lines.append(f"- Framework: {tp.framework}")
@@ -257,6 +273,25 @@ def render_agents_md(dna: CodebaseDNA) -> str:
             lines.append(f"- Mocking: {tp.mock_library}")
         if tp.has_conftest:
             lines.append("- Shared fixtures in `conftest.py`")
+        # add deep testing rules
+        for rule in testing_deep[:2]:
+            lines.append(f"- {rule['text']}")
+
+    # -- naming deep rules --
+    naming_deep = deep_by_category.get("naming", [])
+    if naming_deep:
+        lines.append("\n## Naming\n")
+        for rule in naming_deep[:3]:
+            lines.append(f"- {rule['text']}")
+
+    # -- never_do deep rules (engine-detected, not user-captured) --
+    never_do_deep = deep_by_category.get("never_do", [])
+    if never_do_deep:
+        existing_never = "\n".join(lines)
+        for rule in never_do_deep[:3]:
+            # only add if not already covered by tribal knowledge
+            if rule["text"].lower()[:20] not in existing_never.lower():
+                lines.append(f"- {rule['text']}")
 
     # -- verification workflow --
     if dna.verify_workflow:

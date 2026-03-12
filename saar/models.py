@@ -167,6 +167,9 @@ class CodebaseDNA:
     canonical_examples: List = field(default_factory=list)
     # analysis warnings -- shown in detection summary (e.g. file limit hit)
     analysis_warnings: List[str] = field(default_factory=list)
+    # deep extraction rules -- rules WITH reasoning, not just labels (OPE-96)
+    # Each entry is a DeepRule-like dict: {text, confidence, category, evidence}
+    deep_rules: List = field(default_factory=list)
 
     def to_dict(self) -> Dict:
         return asdict(self)

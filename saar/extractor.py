@@ -1393,6 +1393,9 @@ class DNAExtractor:
         # Extract canonical examples from dependency data (OPE-142)
         self._extract_canonical_examples(dna)
 
+        # Deep extraction -- rules WITH reasoning, not just labels (OPE-96)
+        self._run_deep_extraction(dna, app_files)
+
         elapsed = time.time() - start
         logger.info(
             "DNA extraction complete: %.2fs, %d files read, %d skipped",
@@ -1514,3 +1517,29 @@ class DNAExtractor:
         )
 
         logger.info("Canonical examples: %d categories found", len(dna.canonical_examples))
+
+    def _run_deep_extraction(self, dna, app_files: List[Path]) -> None:
+        """Run deep rule extraction -- patterns WITH reasoning. (OPE-96)
+
+        Stores results as dicts on dna.deep_rules so the formatter
+        can render them as actionable rules instead of bare labels.
+
+        Graceful: any failure here must never break saar extract.
+        """
+        try:
+            from saar.deep_extractor import run_deep_extraction
+            result = run_deep_extraction(app_files, dna, self._safe_read_file)
+            high_confidence = result.all_rules(min_confidence=0.65)
+            dna.deep_rules = [
+                {
+                    "text": r.text,
+                    "confidence": r.confidence,
+                    "category": r.category,
+                    "evidence": r.evidence,
+                }
+                for r in high_confidence
+            ]
+            logger.info("Deep extraction: %d rules generated", len(dna.deep_rules))
+        except Exception as e:
+            logger.warning("Deep extraction failed gracefully: %s", e)
+            dna.deep_rules = []
