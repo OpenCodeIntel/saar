@@ -13,7 +13,7 @@ class TestCLI:
     def test_version(self):
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "0.5.5" in result.stdout
+        assert "0.5.6" in result.stdout
 
     def test_help(self):
         result = runner.invoke(app, ["--help"])
@@ -269,3 +269,55 @@ class TestMarkerEdgeCases:
         assert end_count == 1, (
             f"OPE-169: _write_with_markers produced {end_count} END markers, expected 1"
         )
+
+
+# ── OPE-141: AI tool auto-detection ──────────────────────────────────────────
+
+class TestDetectAiTools:
+    """_detect_ai_tools returns correct formats for tools found in repo."""
+
+    def test_no_tools_returns_empty(self, tmp_path):
+        from saar.cli import _detect_ai_tools
+        result = _detect_ai_tools(tmp_path)
+        assert result == []
+
+    def test_detects_cursorrules_file(self, tmp_path):
+        from saar.cli import _detect_ai_tools, OutputFormat
+        (tmp_path / ".cursorrules").write_text("# cursor rules")
+        result = _detect_ai_tools(tmp_path)
+        assert OutputFormat.cursorrules in result
+
+    def test_detects_cursor_directory(self, tmp_path):
+        from saar.cli import _detect_ai_tools, OutputFormat
+        (tmp_path / ".cursor").mkdir()
+        result = _detect_ai_tools(tmp_path)
+        assert OutputFormat.cursorrules in result
+
+    def test_detects_claude_md(self, tmp_path):
+        from saar.cli import _detect_ai_tools, OutputFormat
+        (tmp_path / "CLAUDE.md").write_text("# claude rules")
+        result = _detect_ai_tools(tmp_path)
+        assert OutputFormat.claude in result
+
+    def test_detects_copilot_instructions(self, tmp_path):
+        from saar.cli import _detect_ai_tools, OutputFormat
+        (tmp_path / ".github").mkdir()
+        (tmp_path / ".github" / "copilot-instructions.md").write_text("# copilot")
+        result = _detect_ai_tools(tmp_path)
+        assert OutputFormat.copilot in result
+
+    def test_detects_multiple_tools(self, tmp_path):
+        from saar.cli import _detect_ai_tools, OutputFormat
+        (tmp_path / ".cursorrules").write_text("rules")
+        (tmp_path / "CLAUDE.md").write_text("# claude")
+        result = _detect_ai_tools(tmp_path)
+        assert OutputFormat.cursorrules in result
+        assert OutputFormat.claude in result
+
+    def test_agents_md_not_detected_as_tool(self, tmp_path):
+        """AGENTS.md existing should not trigger extra format detection."""
+        from saar.cli import _detect_ai_tools
+        (tmp_path / "AGENTS.md").write_text("# agents")
+        result = _detect_ai_tools(tmp_path)
+        # AGENTS.md is always generated -- not a tool to detect
+        assert result == []

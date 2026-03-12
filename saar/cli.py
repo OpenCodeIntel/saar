@@ -345,6 +345,15 @@ def extract(
         ]
     else:
         target_formats = [format]
+        # OPE-141: auto-detect AI tools and add their formats when user
+        # didn't explicitly choose --format all or a specific non-default format.
+        # If they chose --format agents (the default), silently also generate
+        # formats for tools already present in the repo.
+        if format == OutputFormat.agents:
+            detected = _detect_ai_tools(repo_path)
+            for detected_fmt in detected:
+                if detected_fmt not in target_formats:
+                    target_formats.append(detected_fmt)
 
     exclude_rules = [
         _FORMAT_FILENAMES[f] for f in target_formats if f in _FORMAT_FILENAMES
@@ -557,6 +566,38 @@ def _show_detection_summary(dna, console, no_interview: bool) -> bool:
         return True
     except ImportError:
         return True
+
+
+def _detect_ai_tools(repo_path: Path) -> list[OutputFormat]:
+    """Detect which AI tools are present in the repo and return matching formats.
+
+    Why this exists (OPE-141):
+      Users who run Cursor don't know they need --format cursorrules.
+      Users who use Claude Code don't know they need --format claude.
+      saar should just detect what's there and generate it.
+
+    Detection heuristics:
+      Cursor:  .cursor/ directory OR .cursorrules file present
+      Claude:  CLAUDE.md present (Claude Code users often have this)
+      Copilot: .github/copilot-instructions.md present
+
+    AGENTS.md is always generated -- it's the cross-tool standard.
+    """
+    detected: list[OutputFormat] = []
+
+    # Cursor -- check for .cursor/ dir (Cursor v2 workspace) or legacy .cursorrules
+    if (repo_path / ".cursor").is_dir() or (repo_path / ".cursorrules").exists():
+        detected.append(OutputFormat.cursorrules)
+
+    # Claude Code -- CLAUDE.md already present means user wants it maintained
+    if (repo_path / "CLAUDE.md").exists():
+        detected.append(OutputFormat.claude)
+
+    # GitHub Copilot
+    if (repo_path / ".github" / "copilot-instructions.md").exists():
+        detected.append(OutputFormat.copilot)
+
+    return detected
 
 
 def _resolve_output_path(
