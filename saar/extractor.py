@@ -1082,12 +1082,24 @@ class DNAExtractor:
 
         # --- JavaScript / TypeScript frontend ---
         js_steps: list[str] = []
-        pkg_files = [
-            p for p in repo_path.rglob("package.json")
-            if not self._should_skip(p, repo_path)
-            and "node_modules" not in p.parts
-        ]
-        for pkg_file in pkg_files:
+
+        # Use root package.json first, then frontend/ subdirectory -- never all packages recursively.
+        # Scanning all package.json files in a monorepo picks up dozens of lockfiles
+        # with different package managers, producing nonsense like
+        # "yarn run test then npm run test then bun run typecheck".
+        candidate_pkg_files = []
+        for candidate in [
+            repo_path / "package.json",
+            repo_path / "frontend" / "package.json",
+            repo_path / "web" / "package.json",
+            repo_path / "app" / "package.json",
+            repo_path / "apps" / "web" / "package.json",
+        ]:
+            if candidate.exists():
+                candidate_pkg_files.append(candidate)
+                break  # stop at first found -- one source of truth
+
+        for pkg_file in candidate_pkg_files:
             try:
                 data = _json.loads(pkg_file.read_text(encoding="utf-8"))
             except Exception:
