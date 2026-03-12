@@ -1093,3 +1093,261 @@ def _run_scan(repo_path: Path, no_interview: bool = True, index: bool = False) -
 
     if index:
         _run_oci_indexing(repo_path, console)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# saar capture
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.command()
+def capture(
+    rule: str = typer.Argument(
+        ...,
+        help="What Claude got wrong. Plain language -- saar figures out the category.",
+    ),
+    repo_path: Path = typer.Option(
+        Path("."),
+        "--repo", "-r",
+        help="Path to the repository. Defaults to current directory.",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+    ),
+    category: Optional[str] = typer.Option(
+        None, "--category", "-c",
+        help="Override auto-detected category: never_do | domain | off_limits | verify | auth",
+    ),
+    no_regen: bool = typer.Option(
+        False, "--no-regen",
+        help="Skip immediate AGENTS.md regeneration.",
+    ),
+) -> None:
+    """Capture a mistake Claude made -- prevents it forever.
+
+    Unlike `saar add`, capture:
+    - Auto-detects the right category from your words
+    - Immediately regenerates AGENTS.md (no manual re-run needed)
+    - Records the mistake with timestamp in .saar/captures.json
+    - Tracks repeat mistakes: shows when Claude made the same error before
+
+    Examples:
+
+      saar capture "Claude created UserException -- we already have AuthenticationError"
+
+      saar capture "Claude used npm install -- this project uses bun"
+
+      saar capture "Workspace means tenant, not a directory"
+
+      saar capture "never touch billing/ -- legacy Stripe, frozen until Q3"
+    """
+    from saar.capture import classify_capture, record_capture
+    from saar.interview import append_to_cache
+
+    console.print()
+
+    # -- classify ──────────────────────────────────────────────────────────────
+    # map user-friendly aliases to InterviewAnswers field names
+    _ALIAS_MAP = {
+        "never": "never_do",
+        "never_do": "never_do",
+        "domain": "domain_terms",
+        "domain_terms": "domain_terms",
+        "off_limits": "off_limits",
+        "off-limits": "off_limits",
+        "verify": "verify_workflow",
+        "verify_workflow": "verify_workflow",
+        "auth": "auth_gotchas",
+        "auth_gotchas": "auth_gotchas",
+    }
+
+    if category:
+        field_name = _ALIAS_MAP.get(category.lower(), "never_do")
+    else:
+        field_name = classify_capture(rule)
+
+    _FIELD_LABELS = {
+        "never_do": "Never do",
+        "domain_terms": "Domain vocabulary",
+        "off_limits": "Off-limits",
+        "verify_workflow": "Verification",
+        "auth_gotchas": "Auth gotcha",
+        "extra_context": "Context",
+    }
+    label = _FIELD_LABELS.get(field_name, "Never do")
+
+    # -- record in capture log ─────────────────────────────────────────────────
+    entry, is_duplicate = record_capture(repo_path, rule, field_name)
+
+    # -- add to tribal knowledge ───────────────────────────────────────────────
+    append_to_cache(repo_path, field_name, rule)
+
+    # -- display ───────────────────────────────────────────────────────────────
+    if is_duplicate:
+        console.print(
+            f"  [yellow]captured again[/yellow] [{label}] {rule}"
+            f"  [dim](×{entry.count} total)[/dim]"
+        )
+        console.print(
+            f"  [dim]Claude has made this mistake {entry.count} times."
+            f" Rule already in AGENTS.md.[/dim]"
+        )
+    else:
+        console.print(f"  [green]captured[/green] [{label}] {rule}")
+
+    # -- immediately regenerate AGENTS.md ──────────────────────────────────────
+    if no_regen:
+        console.print(
+            "  [dim]Skipped regeneration (--no-regen). "
+            "Run [bold]saar extract . --no-interview[/bold] to update AGENTS.md.[/dim]"
+        )
+        console.print()
+        return
+
+    console.print("  [dim]Regenerating AGENTS.md...[/dim]")
+
+    try:
+        from saar.extractor import DNAExtractor
+        from saar.formatters import render
+        from saar.interview import load_cached
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(repo_path))
+
+        if dna is None:
+            console.print(
+                "  [yellow]Could not regenerate AGENTS.md "
+                "(extraction failed). Rule was saved.[/yellow]"
+            )
+            console.print()
+            return
+
+        # load cached answers including the rule we just added
+        answers = load_cached(repo_path)
+        if answers:
+            dna.interview = answers
+
+        from saar.cli import _write_with_markers
+        from saar.differ import save_snapshot
+
+        text = render(dna, "agents", budget=100)
+        target = repo_path / "AGENTS.md"
+
+        _write_with_markers(target, text, force=False, console=console)
+        save_snapshot(repo_path, dna)
+
+        console.print()
+        console.print(
+            "  [bold green]Done.[/bold green]"
+            "  AGENTS.md updated — Claude won't make this mistake again."
+        )
+
+    except Exception as e:
+        console.print(
+            f"  [yellow]Regeneration failed:[/yellow] {e}\n"
+            "  Rule was saved. Run [bold]saar extract . --no-interview[/bold] manually."
+        )
+
+    console.print()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# saar replay
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.command()
+def replay(
+    repo_path: Path = typer.Argument(
+        Path("."),
+        help="Path to the repository. Defaults to current directory.",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+    ),
+    all_captures: bool = typer.Option(
+        False, "--all", "-a",
+        help="Show all captures including single-occurrence ones.",
+    ),
+) -> None:
+    """Show every mistake Claude has made in this repo -- and what saar learned.
+
+    Surfaces patterns: rules captured multiple times mean Claude keeps
+    making the same mistake. Those are your most important rules.
+
+    Examples:
+
+      saar replay
+
+      saar replay --all
+    """
+    from saar.capture import load_captures
+    from datetime import datetime, timezone
+
+    entries = load_captures(repo_path)
+
+    console.print()
+    console.print(
+        f"  [bold]saar replay[/bold] — [cyan]{repo_path.name}[/cyan]"
+    )
+    console.print()
+
+    if not entries:
+        console.print(
+            "  [dim]No captures yet. When Claude gets something wrong, run:[/dim]\n"
+            "  [bold]saar capture \"what Claude got wrong\"[/bold]"
+        )
+        console.print()
+        return
+
+    # sort by count desc, then by date desc
+    sorted_entries = sorted(entries, key=lambda e: (-e.count, e.captured_at))
+
+    # filter
+    shown = sorted_entries if all_captures else [
+        e for e in sorted_entries if e.count > 1
+    ] or sorted_entries[:10]  # if no repeats, show 10 most recent
+
+    _FIELD_LABELS = {
+        "never_do": "Never do",
+        "domain_terms": "Domain",
+        "off_limits": "Off-limits",
+        "verify_workflow": "Verify",
+        "auth_gotchas": "Auth",
+        "extra_context": "Context",
+    }
+
+    # -- repeat offenders first ────────────────────────────────────────────────
+    repeats = [e for e in shown if e.count > 1]
+    singles = [e for e in shown if e.count == 1]
+
+    if repeats:
+        console.print("  [bold red]Repeat mistakes[/bold red] — Claude keeps getting these wrong:\n")
+        for e in repeats:
+            label = _FIELD_LABELS.get(e.category, e.category)
+            console.print(
+                f"    [red]×{e.count}[/red]  [{label}] {e.rule}"
+            )
+        console.print()
+
+    if singles:
+        console.print("  [bold]Captured once:[/bold]\n")
+        for e in singles[:8]:
+            label = _FIELD_LABELS.get(e.category, e.category)
+            # format date as relative
+            try:
+                dt = datetime.fromisoformat(e.captured_at)
+                days = (datetime.now(timezone.utc) - dt).days
+                age = "today" if days == 0 else f"{days}d ago"
+            except Exception:
+                age = ""
+            console.print(f"    [dim]·[/dim]  [{label}] {e.rule}  [dim]{age}[/dim]")
+        if len(singles) > 8 and not all_captures:
+            console.print(
+                f"    [dim]... and {len(singles) - 8} more. "
+                "Run [bold]saar replay --all[/bold] to see everything.[/dim]"
+            )
+        console.print()
+
+    total = len(entries)
+    repeat_count = len(repeats)
+    console.print(
+        f"  [dim]{total} total captures. "
+        f"{repeat_count} repeat mistakes. "
+        f"All rules are in AGENTS.md.[/dim]"
+    )
+    console.print()

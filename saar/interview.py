@@ -157,15 +157,18 @@ def append_to_cache(repo_path: Path, field: str, value: str) -> InterviewAnswers
     existing = load_cached(repo_path) or InterviewAnswers()
 
     current = getattr(existing, field, None)
+    new_value = value.strip()
 
     if current:
-        # normalize existing content to bullet list then append
+        # normalize existing content to bullet list
         raw_lines = [ln.strip() for ln in current.strip().splitlines() if ln.strip()]
         cleaned = [ln.lstrip("- ").lstrip("* ").strip() for ln in raw_lines]
-        cleaned.append(value.strip())
+        # deduplicate -- don't add if exact rule already present (case-insensitive)
+        if new_value.lower() not in [c.lower() for c in cleaned]:
+            cleaned.append(new_value)
         merged = "\n".join(f"- {ln}" for ln in cleaned)
     else:
-        merged = f"- {value.strip()}"
+        merged = f"- {new_value}"
 
     setattr(existing, field, merged)
     save_cache(repo_path, existing)
