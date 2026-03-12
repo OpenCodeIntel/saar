@@ -200,8 +200,18 @@ class DNAExtractor:
                     return True
         return False
 
-    def _discover_files(self, repo_path: Path) -> Tuple[List[Path], List[Path]]:
+    def _discover_files(
+        self,
+        repo_path: Path,
+        include_roots: Optional[List[Path]] = None,
+    ) -> Tuple[List[Path], List[Path]]:
         """Find code files, split into app files and test files.
+
+        Args:
+            repo_path: Root of the repository (used for _should_skip resolution).
+            include_roots: When provided, only scan these subdirectories.
+                           Used by --include flag for monorepo subset analysis.
+                           Each path should be absolute and under repo_path.
 
         Returns:
             Tuple of (app_files, test_files). Pattern detection runs
@@ -212,25 +222,29 @@ class DNAExtractor:
         test_files: List[Path] = []
         extensions = {".py", ".js", ".jsx", ".ts", ".tsx", ".sql"}
 
+        # determine which roots to scan -- subset or full repo
+        scan_roots = include_roots if include_roots else [repo_path]
+
         try:
-            for item in sorted(repo_path.rglob("*")):
-                if item.is_symlink():
-                    continue
-                if item.is_file() and item.suffix in extensions:
-                    if self._should_skip(item, repo_path):
+            for scan_root in scan_roots:
+                for item in sorted(scan_root.rglob("*")):
+                    if item.is_symlink():
                         continue
-                    if item.suffix in self.SKIP_FILE_SUFFIXES:
-                        continue
-                    total = len(app_files) + len(test_files)
-                    if total >= self.MAX_FILES:
-                        # Store hit count on self so CLI can warn user
-                        self._file_limit_hit = True
-                        logger.warning("Hit max file limit (%d)", self.MAX_FILES)
-                        break
-                    if self._is_test_file(item):
-                        test_files.append(item)
-                    else:
-                        app_files.append(item)
+                    if item.is_file() and item.suffix in extensions:
+                        if self._should_skip(item, repo_path):
+                            continue
+                        if item.suffix in self.SKIP_FILE_SUFFIXES:
+                            continue
+                        total = len(app_files) + len(test_files)
+                        if total >= self.MAX_FILES:
+                            # Store hit count on self so CLI can warn user
+                            self._file_limit_hit = True
+                            logger.warning("Hit max file limit (%d)", self.MAX_FILES)
+                            break
+                        if self._is_test_file(item):
+                            test_files.append(item)
+                        else:
+                            app_files.append(item)
         except Exception as e:
             logger.error("Error discovering files: %s", e)
 
@@ -1305,6 +1319,7 @@ class DNAExtractor:
         repo_path: str,
         exclude_dirs: Optional[list] = None,
         exclude_rules_files: Optional[list] = None,
+        include_paths: Optional[list] = None,
     ) -> Optional[CodebaseDNA]:
         """Extract complete DNA profile from a codebase.
 
@@ -1313,6 +1328,10 @@ class DNAExtractor:
             exclude_dirs: Extra directories to skip during file discovery.
             exclude_rules_files: Config filenames to skip when reading team
                 rules (prevents inception when generating CLAUDE.md etc.).
+            include_paths: Subdirectories to INCLUDE (monorepo subset analysis).
+                When provided, ONLY these directories are scanned for source files.
+                Team rules (CLAUDE.md etc) are always read from repo_path root.
+                Example: ["packages/effect", "packages/schema"]
         """
         start = time.time()
         path = Path(repo_path)
@@ -1337,7 +1356,22 @@ class DNAExtractor:
         repo_name = path.name
         logger.info("Extracting DNA from %s", repo_name)
 
-        app_files, test_files = self._discover_files(path)
+        # resolve include_paths to absolute Path objects (OPE-108)
+        include_roots: Optional[list] = None
+        if include_paths:
+            resolved = []
+            for p in include_paths:
+                candidate = Path(p) if Path(p).is_absolute() else path / p
+                if candidate.is_dir():
+                    resolved.append(candidate)
+                else:
+                    logger.warning("--include path not found: %s (skipped)", candidate)
+            if resolved:
+                include_roots = resolved
+                logger.info("Subset analysis: scanning %d paths: %s",
+                            len(resolved), [str(r.relative_to(path)) for r in resolved])
+
+        app_files, test_files = self._discover_files(path, include_roots=include_roots)
         total = len(app_files) + len(test_files)
         logger.info("Found %d code files (%d app, %d test)", total, len(app_files), len(test_files))
 

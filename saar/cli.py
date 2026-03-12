@@ -295,6 +295,11 @@ def extract(
         "--exclude", "-e",
         help="Directories to skip (e.g. --exclude data vendor repos).",
     ),
+    include: Optional[List[str]] = typer.Option(
+        None,
+        "--include", "-i",
+        help="Subdirectories to analyse (monorepo subset). e.g. --include packages/effect packages/schema",
+    ),
     force: bool = typer.Option(
         False,
         "--force",
@@ -334,6 +339,8 @@ def extract(
     effective_budget = 0 if verbose else budget
 
     console.print(f"[bold]saar[/bold] analyzing [cyan]{repo_path.name}[/cyan]...")
+    if include:
+        console.print(f"  [dim]subset: {' '.join(include)}[/dim]")
 
     # Determine which config files we're writing so we don't read
     # them as "team rules" input (prevents inception loop)
@@ -369,6 +376,7 @@ def extract(
         str(repo_path),
         exclude_dirs=exclude or None,
         exclude_rules_files=exclude_rules or None,
+        include_paths=include or None,
     )
 
     if dna is None:

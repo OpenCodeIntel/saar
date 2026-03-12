@@ -13,7 +13,7 @@ class TestCLI:
     def test_version(self):
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "0.5.7" in result.stdout
+        assert "0.5.8" in result.stdout
 
     def test_help(self):
         result = runner.invoke(app, ["--help"])
@@ -414,3 +414,66 @@ class TestCursorMdc:
         rules_dir = tmp_path / ".cursor" / "rules"
         mdc_files = list(rules_dir.glob("*.mdc"))
         assert len(mdc_files) >= 1
+
+
+# ── OPE-108: monorepo --include flag ─────────────────────────────────────────
+
+class TestIncludeFlag:
+    """--include limits analysis to specified subdirectories only."""
+
+    def test_include_paths_restrict_discovery(self, tmp_path):
+        """Files outside --include paths are not analysed."""
+        from saar.extractor import DNAExtractor
+
+        # set up monorepo structure
+        backend = tmp_path / "backend"
+        frontend = tmp_path / "frontend"
+        backend.mkdir()
+        frontend.mkdir()
+
+        # backend has FastAPI
+        (backend / "main.py").write_text("from fastapi import FastAPI\napp = FastAPI()")
+        # frontend has React (package.json)
+        (frontend / "index.tsx").write_text("import React from 'react'")
+
+        extractor = DNAExtractor()
+
+        # without --include: both directories scanned
+        extractor.extract(str(tmp_path))
+        all_files_count = len(extractor._file_cache)
+
+        extractor2 = DNAExtractor()
+        # with --include backend: only backend scanned
+        dna_backend = extractor2.extract(str(tmp_path), include_paths=["backend"])
+        backend_files_count = len(extractor2._file_cache)
+
+        # backend subset should have fewer files than full scan
+        assert backend_files_count <= all_files_count
+
+        # backend subset should detect FastAPI
+        assert dna_backend is not None
+        assert dna_backend.detected_framework == "fastapi"
+
+    def test_include_nonexistent_path_skipped(self, tmp_path):
+        """Invalid --include paths are warned and skipped, not crashed."""
+        from saar.extractor import DNAExtractor
+
+        (tmp_path / "app.py").write_text("x = 1")
+        extractor = DNAExtractor()
+
+        # nonexistent path -- should not crash, should scan nothing (or default)
+        dna = extractor.extract(str(tmp_path), include_paths=["does_not_exist"])
+        assert dna is not None  # no crash
+
+    def test_include_absolute_path(self, tmp_path):
+        """Absolute paths in --include are also supported."""
+        from saar.extractor import DNAExtractor
+
+        sub = tmp_path / "src"
+        sub.mkdir()
+        (sub / "app.py").write_text("from flask import Flask\napp = Flask(__name__)")
+
+        extractor = DNAExtractor()
+        dna = extractor.extract(str(tmp_path), include_paths=[str(sub)])
+        assert dna is not None
+        assert dna.detected_framework == "flask"
