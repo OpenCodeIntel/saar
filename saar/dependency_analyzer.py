@@ -147,10 +147,12 @@ class DependencyAnalyzer:
                 "import_count": len(imports),
             }
         except RecursionError:
-            logger.warning("Skipped %s (recursion limit -- file too complex)", file_path)
+            # large/circular files exceed Python's recursion limit -- log at DEBUG
+            # so it doesn't pollute user-facing terminal output (OPE-182)
+            logger.debug("Skipped %s (recursion limit -- file too complex)", file_path)
             return {"file": file_path, "imports": [], "language": language}
         except Exception as e:
-            logger.error("Error analyzing %s: %s", file_path, e)
+            logger.debug("Error analyzing %s: %s", file_path, e)
             return {"file": file_path, "imports": [], "language": language}
 
     # -- import resolution ------------------------------------------------

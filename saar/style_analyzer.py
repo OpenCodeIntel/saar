@@ -229,8 +229,10 @@ class StyleAnalyzer:
 
                 total_files += 1
                 lang_dist[language] += 1
+            except RecursionError:
+                logger.debug("Skipped %s in style analysis (recursion limit)", fp)
             except Exception as e:
-                logger.warning("Error analyzing %s: %s", fp, e)
+                logger.debug("Error analyzing %s: %s", fp, e)
 
         func_conv = Counter(self._detect_naming_convention(n) for n in function_names)
         class_conv = Counter(self._detect_naming_convention(n) for n in class_names)
