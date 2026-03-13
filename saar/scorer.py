@@ -257,8 +257,6 @@ def _score_coverage(
 
     return total, section_scores, missing, project_type
 
-    return total, section_scores, missing
-
 
 def _score_precision(content: str, lines: int) -> tuple[int, list[str]]:
     """Penalise generic filler lines and emojis."""
