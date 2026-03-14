@@ -1182,6 +1182,111 @@ def check(
     raise typer.Exit(code=1 if issues else 0)
 
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# saar lint (OPE-177)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.command()
+def lint(
+    repo_path: Path = typer.Argument(
+        Path("."),
+        help="Path to the repository. Defaults to current directory.",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+    ),
+    file: Optional[Path] = typer.Option(
+        None, "--file", "-f",
+        help="Path to specific context file (default: AGENTS.md in repo root).",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        help="Output machine-readable JSON.",
+    ),
+) -> None:
+    """Lint your AGENTS.md -- find duplicates, vague rules, and filler.
+
+    Reports specific violations with line numbers and rule codes, like ruff.
+    Exits 0 if clean, 1 if violations found.
+
+    Rule codes:
+      SA001  Duplicate rule
+      SA002  Orphaned section header
+      SA003  Vague rule (< 6 words)
+      SA004  Generic filler
+      SA005  Emoji in rules
+
+    Examples:
+
+      saar lint
+
+      saar lint ./my-repo
+
+      saar lint --json
+    """
+    import json as _json
+    from saar.linter import lint_file
+
+    target_file = file or (repo_path / "AGENTS.md")
+
+    if not target_file.exists():
+        fallback = repo_path / "CLAUDE.md"
+        if not file and fallback.exists():
+            target_file = fallback
+        else:
+            if as_json:
+                print(_json.dumps({"violations": [], "total": 0,
+                                   "error": "No AGENTS.md found"}))
+            else:
+                console.print(
+                    f"\n  [yellow]No AGENTS.md found in {repo_path.name}[/yellow]\n"
+                    "  Run [bold]saar extract .[/bold] to generate one.\n"
+                )
+            raise typer.Exit(code=1)
+
+    violations = lint_file(target_file)
+    fname = target_file.name
+
+    if as_json:
+        print(_json.dumps({
+            "violations": [
+                {
+                    "line": v.line,
+                    "code": v.code,
+                    "message": v.message,
+                    "fix": v.fix,
+                    "severity": v.severity,
+                }
+                for v in violations
+            ],
+            "total": len(violations),
+        }))
+        raise typer.Exit(code=1 if violations else 0)
+
+    if not violations:
+        console.print(f"\n  [green]saar lint passed[/green]  [dim]{fname} — no violations[/dim]\n")
+        raise typer.Exit(code=0)
+
+    # print violations in ruff style: file:line:col: CODE message
+    console.print()
+    for v in violations:
+        color = "red" if v.severity == "error" else "yellow"
+        console.print(
+            f"  [dim]{fname}:{v.line}:1:[/dim]  "
+            f"[{color}]{v.code}[/{color}]  {v.message}"
+        )
+        if v.fix:
+            console.print(f"  [dim]  fix: {v.fix}[/dim]")
+
+    total = len(violations)
+    noun = "violation" if total == 1 else "violations"
+    console.print(
+        f"\n  [red]Found {total} {noun}.[/red]  "
+        f"[dim]Run [bold]saar stats .[/bold] for a full quality score.[/dim]\n"
+    )
+    raise typer.Exit(code=1)
+
+
 @app.command(name="init")
 def init_cmd(
     repo_path: Path = typer.Argument(
