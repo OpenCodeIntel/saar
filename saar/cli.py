@@ -1125,7 +1125,7 @@ def check(
             if as_json:
                 print(_json.dumps({"ok": False, "issues": issues, "score": 0}))
             else:
-                console.print(f"\n  [red]saar check failed[/red]")
+                console.print("\n  [red]saar check failed[/red]")
                 for issue in issues:
                     console.print(f"  [yellow]{issue}[/yellow]")
                 console.print()
@@ -1171,7 +1171,7 @@ def check(
             for issue in issues:
                 console.print(f"  [yellow]{issue}[/yellow]")
             console.print(
-                f"\n  [dim]Run [bold]saar stats .[/bold] for a full quality breakdown.[/dim]\n"
+                "\n  [dim]Run [bold]saar stats .[/bold] for a full quality breakdown.[/dim]\n"
             )
         else:
             console.print(

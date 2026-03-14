@@ -1,8 +1,8 @@
 <!-- SAAR:AUTO-START -->
 # CLAUDE.md -- saar
 
-694 functions, 121 classes.
-Async adoption: 16%.
+713 functions, 128 classes.
+Async adoption: 15%.
 Type hint coverage: 96%.
 
 ## Coding Conventions
@@ -35,11 +35,11 @@ from dataclasses import dataclass
 These files have the most dependents -- understand them before editing:
 
 - `saar/models.py` (23 dependents)
-- `saar/cli.py` (9 dependents)
+- `saar/cli.py` (10 dependents)
 - `saar/formatters/agents_md.py` (7 dependents)
 - `saar/extractor.py` (6 dependents)
-- `saar/formatters/_tribal.py` (4 dependents)
 - `saar/formatters/claude_md.py` (4 dependents)
+- `saar/formatters/_tribal.py` (4 dependents)
 - `saar/interview.py` (3 dependents)
 - `saar/differ.py` (3 dependents)
 
@@ -75,6 +75,7 @@ These files have the most dependents -- understand them before editing:
 - extractor.py is 1579 lines -- all methods share self._file_cache, never break this when adding languages
 - benchmark/ contains OPE-99 results -- never delete benchmark_results.json or benchmark_report.md
 - saar has NO web auth -- ignore any detected Depends(reusable_oauth2), it is a false positive from test fixtures
+- Always run ruff check saar/ tests/ before committing -- CI will fail on F541 (f-string without placeholders) and other lint errors. Run: source venv/bin/activate && ruff check saar/ tests/ && pytest tests/ -q
 
 ### Domain Vocabulary
 
