@@ -113,6 +113,19 @@ class TestSA001Duplicates:
         # case-insensitive: these are the same rule
         assert len(sa001) >= 1
 
+    def test_code_fence_markers_not_flagged_as_duplicates(self):
+        from saar.linter import lint_agents_md
+        content = (
+            "## Imports\n"
+            "```\n"
+            "from pathlib import Path\n"
+            "import logging\n"
+            "```\n"   # closing fence -- must NOT be flagged as duplicate of opening
+        )
+        violations = lint_agents_md(content)
+        sa001 = [v for v in violations if v.code == "SA001"]
+        assert sa001 == []
+
     def test_blank_lines_not_flagged_as_duplicates(self):
         from saar.linter import lint_agents_md
         content = "## A\n\n- rule one\n\n## B\n\n- rule two\n"

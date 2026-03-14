@@ -93,8 +93,8 @@ def _check_sa001_duplicates(lines: list[str]) -> list[LintViolation]:
 
     for i, raw in enumerate(lines, start=1):
         stripped = raw.strip()
-        # skip blank lines, markdown headers, HTML comments
-        if not stripped or stripped.startswith("#") or stripped.startswith("<!--"):
+        # skip blank lines, markdown headers, HTML comments, code fences
+        if not stripped or stripped.startswith("#") or stripped.startswith("<!--") or stripped.startswith("```"):
             continue
 
         normalised = stripped.lower()
@@ -179,6 +179,16 @@ def _check_sa003_vague_rules(lines: list[str]) -> list[LintViolation]:
         # strip the bullet marker and count words
         rule_text = stripped[2:].strip()
         word_count = len(rule_text.split())
+
+        # skip label:value convention entries like "Functions: `snake_case`"
+        # these are metadata declarations, not actionable rules
+        if re.match(r'^[A-Za-z][A-Za-z ]+:\s+', rule_text):
+            continue
+
+        # skip file reference entries like "`saar/models.py` (3 dependents)"
+        # these are architecture metadata, not rules
+        if rule_text.startswith("`") and "/" in rule_text:
+            continue
 
         if word_count < 6 and word_count > 0:
             violations.append(LintViolation(
