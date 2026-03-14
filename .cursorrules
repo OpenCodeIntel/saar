@@ -7,6 +7,11 @@
 - Name classes in PascalCase
 - Name files in snake_case
 
+## Error Handling
+
+- Use: OCIAPIError, OCIAuthError
+- Log before re-raising
+
 ## Testing
 
 - Framework: pytest
@@ -15,14 +20,14 @@
 
 ## Common Imports
 
+- from pathlib import Path
+- from __future__ import annotations
 - import logging
 - from saar.models import CodebaseDNA
-- from pathlib import Path
-- from typing import Optional
-- import re
-- import tree_sitter_python as tspython
-- import tree_sitter_javascript as tsjavascript
-- from tree_sitter import Language, Parser
 - import json
+- import re
+- from typing import Optional
 - import os
+- import time
+- from dataclasses import dataclass
 <!-- SAAR:AUTO-END -->
