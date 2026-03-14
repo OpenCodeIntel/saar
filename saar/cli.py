@@ -1065,6 +1065,123 @@ def stats(
 # saar init
 # ──────────────────────────────────────────────────────────────────────────────
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# saar check (OPE-190)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.command()
+def check(
+    repo_path: Path = typer.Argument(
+        Path("."),
+        help="Path to the repository to check. Defaults to current directory.",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+    ),
+    file: Optional[Path] = typer.Option(
+        None, "--file", "-f",
+        help="Path to specific context file (default: AGENTS.md in repo root).",
+    ),
+    max_age: int = typer.Option(
+        14,
+        "--max-age",
+        help="Fail if AGENTS.md is older than this many days (0 = never fail on age).",
+        min=0,
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        help="Output machine-readable JSON for CI parsers.",
+    ),
+) -> None:
+    """Check AGENTS.md health for CI. Exits 0 if OK, 1 if issues found.
+
+    Checks:
+      - AGENTS.md exists
+      - AGENTS.md is not stale (within --max-age days)
+      - Required sections are present (verify, never-do, stack)
+
+    Examples:
+
+      saar check
+
+      saar check ./my-repo
+
+      saar check --max-age 7
+
+      saar check --json   # for GitHub Actions / CI parsers
+    """
+    import json as _json
+    from saar.scorer import score_agents_md
+
+    target_file = file or (repo_path / "AGENTS.md")
+
+    # -- file missing --
+    if not target_file.exists():
+        fallback = repo_path / "CLAUDE.md"
+        if not file and fallback.exists():
+            target_file = fallback
+        else:
+            issues = [f"No AGENTS.md found in {repo_path.name} -- run saar extract . to generate one"]
+            if as_json:
+                print(_json.dumps({"ok": False, "issues": issues, "score": 0}))
+            else:
+                console.print(f"\n  [red]saar check failed[/red]")
+                for issue in issues:
+                    console.print(f"  [yellow]{issue}[/yellow]")
+                console.print()
+            raise typer.Exit(code=1)
+
+    result = score_agents_md(target_file, repo_path)
+    issues: list[str] = []
+
+    # -- staleness check (only when snapshot exists and max_age > 0) --
+    if max_age > 0 and result.freshness_days is not None:
+        if result.freshness_days > max_age:
+            issues.append(
+                f"AGENTS.md is {result.freshness_days} days old "
+                f"(max-age: {max_age}) -- run saar diff . to see what changed"
+            )
+
+    # -- required sections check --
+    # Only flag sections that are truly project-agnostic requirements.
+    # We don't require auth/exceptions for libraries (scorer already handles this).
+    _REQUIRED = {"Verification workflow", "Never-do rules", "Stack info"}
+    for section in result.missing_sections:
+        if section in _REQUIRED:
+            issues.append(
+                f"Missing section: {section} -- "
+                f"use `saar add` or re-run `saar extract .`"
+            )
+
+    # -- output --
+    if as_json:
+        # Use print() not console.print() -- Rich wraps long lines at terminal width,
+        # inserting literal newlines that break JSON parsing.
+        print(_json.dumps({
+            "ok": len(issues) == 0,
+            "issues": issues,
+            "score": result.score if hasattr(result, "score") else result.total_score,
+            "freshness_days": result.freshness_days,
+            "missing_sections": result.missing_sections,
+        }))
+    else:
+        if issues:
+            console.print(f"\n  [red]saar check failed[/red]  "
+                          f"[dim]{target_file.name}[/dim]")
+            for issue in issues:
+                console.print(f"  [yellow]{issue}[/yellow]")
+            console.print(
+                f"\n  [dim]Run [bold]saar stats .[/bold] for a full quality breakdown.[/dim]\n"
+            )
+        else:
+            console.print(
+                f"\n  [green]saar check passed[/green]  "
+                f"[dim]{target_file.name} is up to date[/dim]\n"
+            )
+
+    raise typer.Exit(code=1 if issues else 0)
+
+
 @app.command(name="init")
 def init_cmd(
     repo_path: Path = typer.Argument(
