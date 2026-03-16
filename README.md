@@ -2,21 +2,19 @@
 
 <br />
 
-# saar
+<img src="./docs/banner.svg" alt="saar — your AI finally knows your codebase" width="100%" />
 
-### Your AI coding assistant doesn't know your codebase. saar fixes that in 10 seconds.
-
-<br />
+<br /><br />
 
 [![PyPI](https://img.shields.io/pypi/v/saar.svg?color=F4C343&labelColor=0D1420)](https://pypi.org/project/saar/)
 [![Downloads](https://img.shields.io/pypi/dm/saar.svg?labelColor=0D1420)](https://pypi.org/project/saar/)
 [![Tests](https://img.shields.io/badge/tests-548%20passing-4EFF9A?labelColor=0D1420)](https://github.com/OpenCodeIntel/saar/actions)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue?labelColor=0D1420)](./LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-white?labelColor=0D1420)](./LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue?labelColor=0D1420)](https://www.python.org/downloads/)
 
 <br />
 
-[**getsaar.com**](https://getsaar.com) · [**Website**](https://getsaar.com) · [**PyPI**](https://pypi.org/project/saar/) · [**Issues**](https://github.com/OpenCodeIntel/saar/issues) · [**OCI**](https://opencodeintel.com)
+[**getsaar.com**](https://getsaar.com) &nbsp;·&nbsp; [**PyPI**](https://pypi.org/project/saar/) &nbsp;·&nbsp; [**Issues**](https://github.com/OpenCodeIntel/saar/issues) &nbsp;·&nbsp; [**OCI**](https://opencodeintel.com)
 
 <br />
 
