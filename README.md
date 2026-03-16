@@ -1,16 +1,18 @@
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:080C14,50:0D1420,100:080C14&height=220&text=saar&fontSize=90&fontColor=F4C343&animation=fadeIn&fontAlignY=38&desc=Your%20AI%20coding%20assistant%20doesn%27t%20know%20your%20codebase.%20saar%20fixes%20that%20in%2010%20seconds.&descSize=16&descAlignY=60&descColor=9E9A92" width="100%" />
+
 <div align="center">
 
 <br />
 
-<img src="./docs/banner.svg" alt="saar — your AI finally knows your codebase" width="100%" />
+[![PyPI](https://img.shields.io/pypi/v/saar.svg?color=F4C343&labelColor=0D1420&style=flat-square)](https://pypi.org/project/saar/)
+[![Downloads](https://img.shields.io/pypi/dm/saar.svg?labelColor=0D1420&color=4EFF9A&style=flat-square)](https://pypi.org/project/saar/)
+[![Tests](https://img.shields.io/badge/tests-548%20passing-4EFF9A?labelColor=0D1420&style=flat-square)](https://github.com/OpenCodeIntel/saar/actions)
+[![License: MIT](https://img.shields.io/badge/license-MIT-818CF8?labelColor=0D1420&style=flat-square)](./LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-60A5FA?labelColor=0D1420&style=flat-square)](https://www.python.org/downloads/)
 
-<br /><br />
+<br />
 
-[![PyPI](https://img.shields.io/pypi/v/saar.svg?color=F4C343&labelColor=0D1420)](https://pypi.org/project/saar/)
-[![Downloads](https://img.shields.io/pypi/dm/saar.svg?labelColor=0D1420)](https://pypi.org/project/saar/)
-[![Tests](https://img.shields.io/badge/tests-548%20passing-4EFF9A?labelColor=0D1420)](https://github.com/OpenCodeIntel/saar/actions)
-[![License: MIT](https://img.shields.io/badge/license-MIT-white?labelColor=0D1420)](./LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue?labelColor=0D1420)](https://www.python.org/downloads/)
+[![Typing SVG](https://readme-typing-svg.demolab.com?font=JetBrains+Mono&size=14&duration=2800&pause=600&color=F4C343&center=true&vCenter=true&width=620&lines=Detects+your+package+manager+(bun%2C+pnpm%2C+npm%2C+uv);Finds+your+logging+library+(structlog%2C+winston%2C+pino);Maps+your+auth+patterns+(JwtAuthGuard%2C+require_auth);Catches+all+218+custom+exception+classes;Generates+AGENTS.md+in+10+seconds.+No+account.+No+API+key.)](https://git.io/typing-svg)
 
 <br />
 
@@ -360,8 +362,10 @@ MIT. Free forever. Do whatever you want with it.
 
 <div align="center">
 
-**[getsaar.com](https://getsaar.com)** · **[PyPI](https://pypi.org/project/saar/)** · **[MIT License](./LICENSE)**
+**[getsaar.com](https://getsaar.com)** &nbsp;·&nbsp; **[PyPI](https://pypi.org/project/saar/)** &nbsp;·&nbsp; **[MIT License](./LICENSE)**
 
 *If saar saved you time, a ⭐ helps others find it.*
 
 </div>
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:080C14,50:0D1420,100:080C14&height=100&section=footer" width="100%" />
