@@ -1,0 +1,80 @@
+name: Auto Release + Publish
+
+# Triggers on every push to main.
+# If the version in pyproject.toml has no git tag yet, it:
+#   1. Creates the git tag (v0.x.y)
+#   2. Creates a GitHub Release
+#   3. Builds and publishes to PyPI
+# If the version already has a tag, it does nothing.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from pyproject.toml
+        id: version
+        run: |
+          VERSION=$(grep '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
+
+      - name: Check if tag already exists
+        id: tag_check
+        run: |
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag v${{ steps.version.outputs.version }} already exists -- skipping release"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Tag v${{ steps.version.outputs.version }} is new -- will release"
+          fi
+
+      - name: Set up Python
+        if: steps.tag_check.outputs.exists == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build distribution
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          pip install build
+          python -m build
+
+      - name: Create git tag
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        if: steps.tag_check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          body: |
+            Release v${{ steps.version.outputs.version }}
+
+            See [CHANGELOG](https://github.com/OpenCodeIntel/saar/blob/main/CHANGELOG.md) for details.
+          files: dist/*
+
+      - name: Publish to PyPI
+        if: steps.tag_check.outputs.exists == 'false'
+        uses: pypa/gh-action-pypi-publish@release/v1
