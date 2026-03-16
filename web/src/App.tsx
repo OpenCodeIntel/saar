@@ -208,9 +208,9 @@ function TheProof() {
   return (
     <section className="py-24 px-6">
       <div className="max-w-6xl mx-auto">
-        <div ref={ref} className="reveal text-center mb-16">
-          <div className="section-divider mb-8" />
-          <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-4">The proof</p>
+        <div ref={ref} className="reveal text-center mb-12">
+          <div className="section-divider mb-6" />
+          <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-3">The proof</p>
           <h2 className="display-headline text-cream mb-4" style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>
             You've seen this before.
           </h2>
@@ -232,25 +232,25 @@ function TheProof() {
             className="absolute top-0 left-0 bottom-0 overflow-hidden"
             style={{ width: `${splitPos}%` }}
           >
-            <div className="h-full flex flex-col" style={{ width: '100vw', maxWidth: '960px' }}>
+            <div className="h-full w-full flex flex-col">
               <div className="bg-[#1A0A0A] px-4 py-2 border-b border-red-900/30 flex items-center justify-between shrink-0">
-                <span className="text-[#FF4E4E]/70 text-xs font-mono">Without saar</span>
-                <span className="text-[#FF4E4E]/50 text-xs whitespace-nowrap">AI is guessing</span>
+                <span style={{ color: 'rgba(255,78,78,0.7)' }} className="text-xs font-mono">Without saar</span>
+                <span style={{ color: 'rgba(255,78,78,0.5)' }} className="text-xs whitespace-nowrap">AI is guessing</span>
               </div>
-              <div className="flex-1 p-5 font-mono text-sm space-y-3 bg-[#100808] overflow-hidden">
-                <p className="text-cream-muted text-xs">You asked: "Add the date-fns library"</p>
-                <div className="bg-[#1A0808] border border-red-900/20 rounded-lg p-4 space-y-2">
-                  <p className="text-cream-dim text-xs">Searched for lockfiles... found package.json</p>
-                  <p className="text-cream">Uses <span className="line-through text-[#FF4E4E]">npm</span>:</p>
-                  <div className="text-[#FF7777] bg-[#200000] px-3 py-2 rounded font-mono text-xs whitespace-nowrap">
+              <div className="flex-1 p-5 font-mono text-sm space-y-3 overflow-hidden" style={{ background: '#0D0404' }}>
+                <p className="text-xs" style={{ color: 'rgb(158,154,146)' }}>You asked: "Add the date-fns library"</p>
+                <div className="rounded-lg p-4 space-y-2" style={{ background: '#1A0808', border: '1px solid rgba(180,0,0,0.2)' }}>
+                  <p className="text-xs" style={{ color: 'rgb(90,87,80)' }}>Searched for lockfiles... found package.json</p>
+                  <p style={{ color: 'rgb(232,227,217)' }}>Uses <span className="line-through" style={{ color: '#FF4E4E' }}>npm</span>:</p>
+                  <div className="px-3 py-2 rounded font-mono text-xs whitespace-nowrap" style={{ color: '#FF7777', background: '#200000' }}>
                     npm install date-fns
                   </div>
-                  <p className="text-cream-dim text-xs flex items-center gap-1">
+                  <p className="text-xs flex items-center gap-1" style={{ color: 'rgb(90,87,80)' }}>
                     <X size={11} weight="bold" color="#FF4E4E" />
                     Project uses bun. Build will fail.
                   </p>
                 </div>
-                <p className="text-[#FF4E4E]/60 text-xs italic">Claude missed bun.lock entirely</p>
+                <p className="text-xs italic" style={{ color: 'rgba(255,78,78,0.5)' }}>Claude missed bun.lock entirely</p>
               </div>
             </div>
           </div>
@@ -260,25 +260,25 @@ function TheProof() {
             className="absolute top-0 right-0 bottom-0 overflow-hidden"
             style={{ left: `${splitPos}%` }}
           >
-            <div className="h-full flex flex-col" style={{ width: '100vw', maxWidth: '960px' }}>
+            <div className="h-full w-full flex flex-col">
               <div className="bg-[#071A0F] px-4 py-2 border-b border-green-900/30 flex items-center justify-between shrink-0">
-                <span className="text-[#4EFF9A]/70 text-xs font-mono">With saar</span>
-                <span className="text-[#4EFF9A]/50 text-xs whitespace-nowrap">AI knows your codebase</span>
+                <span style={{ color: 'rgba(78,255,154,0.7)' }} className="text-xs font-mono">With saar</span>
+                <span style={{ color: 'rgba(78,255,154,0.5)' }} className="text-xs whitespace-nowrap">AI knows your codebase</span>
               </div>
-              <div className="flex-1 p-5 font-mono text-sm space-y-3 bg-[#060F08] overflow-hidden">
-                <p className="text-cream-muted text-xs">You asked: "Add the date-fns library"</p>
-                <div className="bg-[#071508] border border-green-900/20 rounded-lg p-4 space-y-2">
-                  <p className="text-cream-dim text-xs">AGENTS.md: package manager is bun</p>
-                  <p className="text-cream">Uses <span style={{ color: '#4EFF9A' }}>bun</span>:</p>
-                  <div style={{ color: '#4EFF9A', background: '#001200' }} className="px-3 py-2 rounded font-mono text-xs whitespace-nowrap">
+              <div className="flex-1 p-5 font-mono text-sm space-y-3 overflow-hidden" style={{ background: '#040D06' }}>
+                <p className="text-xs" style={{ color: 'rgb(158,154,146)' }}>You asked: "Add the date-fns library"</p>
+                <div className="rounded-lg p-4 space-y-2" style={{ background: '#071508', border: '1px solid rgba(0,160,60,0.2)' }}>
+                  <p className="text-xs" style={{ color: 'rgb(90,87,80)' }}>AGENTS.md: package manager is bun</p>
+                  <p style={{ color: 'rgb(232,227,217)' }}>Uses <span style={{ color: '#4EFF9A' }}>bun</span>:</p>
+                  <div className="px-3 py-2 rounded font-mono text-xs whitespace-nowrap" style={{ color: '#4EFF9A', background: '#001200' }}>
                     bun add date-fns
                   </div>
-                  <p className="text-cream-dim text-xs flex items-center gap-1">
+                  <p className="text-xs flex items-center gap-1" style={{ color: 'rgb(90,87,80)' }}>
                     <Check size={11} weight="bold" color="#4EFF9A" />
                     Correct. Build succeeds.
                   </p>
                 </div>
-                <p className="text-xs italic" style={{ color: 'rgba(78,255,154,0.6)' }}>Zero file exploration needed</p>
+                <p className="text-xs italic" style={{ color: 'rgba(78,255,154,0.5)' }}>Zero file exploration needed</p>
               </div>
             </div>
           </div>
@@ -346,9 +346,9 @@ function HowItWorks() {
   return (
     <section className="py-24 px-6" style={{ background: 'rgba(4,7,15,0.5)' }}>
       <div className="max-w-5xl mx-auto">
-        <div ref={ref} className="reveal text-center mb-16">
-          <div className="section-divider mb-8" />
-          <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-4">The process</p>
+        <div ref={ref} className="reveal text-center mb-12">
+          <div className="section-divider mb-6" />
+          <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-3">The process</p>
           <h2 className="display-headline text-cream" style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>
             Ten seconds.<br />One command.
           </h2>
@@ -389,9 +389,9 @@ function WhatItCaptures() {
   return (
     <section className="py-24 px-6">
       <div className="max-w-5xl mx-auto">
-        <div ref={ref} className="reveal text-center mb-16">
-          <div className="section-divider mb-8" />
-          <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-4">What saar extracts</p>
+        <div ref={ref} className="reveal text-center mb-10">
+          <div className="section-divider mb-6" />
+          <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-3">What saar extracts</p>
           <h2 className="display-headline text-cream" style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>
             Everything your AI<br />was missing.
           </h2>
@@ -427,9 +427,9 @@ function Stats() {
   return (
     <section className="py-24 px-6 overflow-hidden" style={{ background: 'rgba(4,7,15,0.5)' }}>
       <div className="max-w-5xl mx-auto">
-        <div ref={ref} className="reveal text-center mb-16">
-          <div className="section-divider mb-8" />
-          <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-4">By the numbers</p>
+        <div ref={ref} className="reveal text-center mb-12">
+          <div className="section-divider mb-6" />
+          <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-3">By the numbers</p>
           <h2 className="display-headline text-cream" style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>
             Built for real teams.<br />Used on real codebases.
           </h2>
