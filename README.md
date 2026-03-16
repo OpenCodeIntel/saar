@@ -5,7 +5,7 @@
 <br />
 
 [![PyPI](https://img.shields.io/pypi/v/saar.svg?color=F4C343&labelColor=0D1420&style=flat-square)](https://pypi.org/project/saar/)
-[![Downloads](https://img.shields.io/pypi/dm/saar.svg?label=downloads%2Fmonth&labelColor=0D1420&color=4EFF9A&style=flat-square)](https://pypi.org/project/saar/)
+[![Downloads](https://img.shields.io/pypi/dm/saar.svg?label=downloads&labelColor=0D1420&color=4EFF9A&style=flat-square)](https://pypi.org/project/saar/)
 [![Tests](https://img.shields.io/badge/tests-548%20passing-4EFF9A?labelColor=0D1420&style=flat-square)](https://github.com/OpenCodeIntel/saar/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-818CF8?labelColor=0D1420&style=flat-square)](./LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-60A5FA?labelColor=0D1420&style=flat-square)](https://www.python.org/downloads/)
