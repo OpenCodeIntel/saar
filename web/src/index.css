@@ -116,12 +116,12 @@ body {
   transform: translateY(-2px);
 }
 
-/* Section divider */
+/* Section divider — amber line above section labels */
 .section-divider {
-  width: 40px;
+  width: 32px;
   height: 1px;
-  background: rgba(244,195,67,0.35);
-  margin: 0 auto;
+  background: rgba(244,195,67,0.4);
+  margin: 0 auto 20px;
 }
 
 /* Stat number */

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Copy, CheckCircle, GithubLogo, ArrowRight,
-  Terminal, Lightning, ShieldCheck, FileText,
-  Code, Stack, X, Check, ArrowsLeftRight
+  X, Check, ArrowsLeftRight
 } from '@phosphor-icons/react'
 
 // ── Scroll reveal hook ──────────────────────────────────────────────────────
@@ -209,7 +208,7 @@ function TheProof() {
     <section className="py-24 px-6">
       <div className="max-w-6xl mx-auto">
         <div ref={ref} className="reveal text-center mb-12">
-          <div className="section-divider mb-6" />
+          <div className="section-divider" />
           <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-3">The proof</p>
           <h2 className="display-headline text-cream mb-4" style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>
             You've seen this before.
@@ -347,7 +346,7 @@ function HowItWorks() {
     <section className="py-24 px-6" style={{ background: 'rgba(4,7,15,0.5)' }}>
       <div className="max-w-5xl mx-auto">
         <div ref={ref} className="reveal text-center mb-12">
-          <div className="section-divider mb-6" />
+          <div className="section-divider" />
           <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-3">The process</p>
           <h2 className="display-headline text-cream" style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>
             Ten seconds.<br />One command.
@@ -362,15 +361,12 @@ function HowItWorks() {
 }
 
 // ── What it captures ────────────────────────────────────────────────────────
-function FeatureCard({ icon: Icon, label, ex, color }: { icon: React.ElementType; label: string; ex: string; color: string }) {
+function FeatureCard({ label, ex, color }: { icon: null; label: string; ex: string; color: string }) {
   const r = useReveal()
   return (
-    <div ref={r} className="reveal feature-card rounded-xl p-5 group">
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-4"
-        style={{ background: `${color}18`, border: `1px solid ${color}30` }}>
-        <Icon size={16} weight="duotone" color={color} />
-      </div>
-      <p className="text-cream text-sm font-medium mb-1">{label}</p>
+    <div ref={r} className="reveal feature-card rounded-xl p-6 group">
+      <div className="w-2 h-2 rounded-full mb-5" style={{ background: color }} />
+      <p className="text-cream text-sm font-medium mb-2">{label}</p>
       <p className="text-cream-dim font-mono text-xs">{ex}</p>
     </div>
   )
@@ -379,18 +375,18 @@ function FeatureCard({ icon: Icon, label, ex, color }: { icon: React.ElementType
 function WhatItCaptures() {
   const ref = useReveal()
   const items = [
-    { icon: Terminal, label: 'Package manager', ex: 'bun, pnpm, uv', color: '#F4C343' },
-    { icon: Stack, label: 'Logging library', ex: 'structlog, winston, pino', color: '#818CF8' },
-    { icon: ShieldCheck, label: 'Auth patterns', ex: 'JwtAuthGuard, Depends(require_auth)', color: '#34D399' },
-    { icon: FileText, label: 'Naming conventions', ex: 'kebab-case, snake_case', color: '#F472B6' },
-    { icon: Code, label: 'Exception classes', ex: '218 custom types, top 10 shown', color: '#FB923C' },
-    { icon: Lightning, label: 'Tribal knowledge', ex: 'Off-limits files, domain terms', color: '#60A5FA' },
+    { icon: null, label: 'Package manager', ex: 'bun, pnpm, uv', color: '#F4C343' },
+    { icon: null, label: 'Logging library', ex: 'structlog, winston, pino', color: '#818CF8' },
+    { icon: null, label: 'Auth patterns', ex: 'JwtAuthGuard, Depends(require_auth)', color: '#34D399' },
+    { icon: null, label: 'Naming conventions', ex: 'kebab-case, snake_case', color: '#F472B6' },
+    { icon: null, label: 'Exception classes', ex: '218 custom types, top 10 shown', color: '#FB923C' },
+    { icon: null, label: 'Tribal knowledge', ex: 'Off-limits files, domain terms', color: '#60A5FA' },
   ]
   return (
     <section className="py-24 px-6">
       <div className="max-w-5xl mx-auto">
         <div ref={ref} className="reveal text-center mb-10">
-          <div className="section-divider mb-6" />
+          <div className="section-divider" />
           <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-3">What saar extracts</p>
           <h2 className="display-headline text-cream" style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>
             Everything your AI<br />was missing.
@@ -428,7 +424,7 @@ function Stats() {
     <section className="py-24 px-6 overflow-hidden" style={{ background: 'rgba(4,7,15,0.5)' }}>
       <div className="max-w-5xl mx-auto">
         <div ref={ref} className="reveal text-center mb-12">
-          <div className="section-divider mb-6" />
+          <div className="section-divider" />
           <p className="text-cream-muted font-mono text-xs tracking-widest uppercase mb-3">By the numbers</p>
           <h2 className="display-headline text-cream" style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>
             Built for real teams.<br />Used on real codebases.
