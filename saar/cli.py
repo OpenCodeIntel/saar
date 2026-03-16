@@ -270,11 +270,51 @@ def diff(
     raise typer.Exit(code=1 if changes else 0)
 
 
+def _print_no_files_error(repo_path: Path, console: Console) -> None:
+    """Print a helpful error when no code files are found.
+
+    Tells the user what files ARE in the directory and what saar supports,
+    instead of the useless 'Extraction failed' message.
+    """
+    supported = {".py", ".js", ".jsx", ".ts", ".tsx", ".sql"}  # noqa: F841
+
+    # sample what's actually in the directory
+    all_files = list(repo_path.rglob("*"))
+    extensions_found: dict = {}
+    for f in all_files:
+        if f.is_file() and f.suffix and "node_modules" not in f.parts:
+            ext = f.suffix.lower()
+            extensions_found[ext] = extensions_found.get(ext, 0) + 1
+
+    console.print()
+    console.print(f"  [red]No code files found in {repo_path.name}[/red]")
+    console.print()
+    console.print("  saar analyzes: [cyan].py  .js  .jsx  .ts  .tsx  .sql[/cyan]")
+    console.print()
+
+    if extensions_found:
+        top = sorted(extensions_found.items(), key=lambda x: -x[1])[:6]
+        found_str = "  ".join(f"{ext} ({n})" for ext, n in top)
+        console.print(f"  Found in {repo_path.name}: [dim]{found_str}[/dim]")
+        console.print()
+
+        skip_hints = []
+        for d in ["dist", "build", "vendor", "venv", ".venv", "node_modules"]:
+            if (repo_path / d).is_dir():
+                skip_hints.append(d)
+        if skip_hints:
+            console.print(f"  [dim]Note: saar skips {', '.join(skip_hints)} by default.[/dim]")
+            console.print()
+
+    console.print("  [dim]Run with --verbose for full details.[/dim]")
+    console.print()
+
+
 @app.command()
 def extract(
     repo_path: Path = typer.Argument(
-        ...,
-        help="Path to the repository to analyze.",
+        Path("."),
+        help="Path to the repository to analyze. Defaults to current directory.",
         exists=True,
         file_okay=False,
         dir_okay=True,
@@ -380,7 +420,8 @@ def extract(
     )
 
     if dna is None:
-        console.print("[red]Extraction failed. Use --verbose for details.[/red]")
+        # Give a useful error -- tell them what files ARE there and what saar needs
+        _print_no_files_error(repo_path, console)
         raise typer.Exit(code=1)
 
     # -- show detection summary and ask for confirmation --
