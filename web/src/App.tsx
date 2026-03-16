@@ -46,7 +46,8 @@ function Nav() {
     return () => window.removeEventListener('scroll', fn)
   }, [])
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-navy-900/90 backdrop-blur-md border-b border-white/5' : ''}`}>
+    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'backdrop-blur-md border-b border-white/5' : ''}`}
+      style={scrolled ? { background: 'rgba(8,12,20,0.92)' } : {}}>
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <span className="font-serif italic text-xl text-amber-saar tracking-tight">saar</span>
         <div className="flex items-center gap-6">
@@ -94,7 +95,8 @@ function Hero() {
 
       <div className="max-w-4xl mx-auto text-center relative z-10">
         {/* Badge */}
-        <div className="inline-flex items-center gap-2 border border-amber-saar/20 bg-amber-muted rounded-full px-4 py-1.5 mb-10">
+        <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-10"
+          style={{ border: '1px solid rgba(244,195,67,0.2)', background: 'rgba(244,195,67,0.07)' }}>
           <span className="w-1.5 h-1.5 rounded-full bg-amber-saar animate-pulse" />
           <span className="text-amber-saar text-xs font-mono tracking-widest uppercase">Open Source · PyPI</span>
         </div>
@@ -342,7 +344,7 @@ function HowItWorks() {
     },
   ]
   return (
-    <section className="py-24 px-6 bg-navy-950/50">
+    <section className="py-24 px-6" style={{ background: 'rgba(4,7,15,0.5)' }}>
       <div className="max-w-5xl mx-auto">
         <div ref={ref} className="reveal text-center mb-16">
           <div className="section-divider mb-8" />
@@ -457,10 +459,11 @@ function LintTeaser() {
                 <p className="text-cream-muted leading-relaxed mb-6">
                   Like ruff, but for your AGENTS.md. Catches duplicate rules, orphaned headers, vague instructions, generic filler, and emojis — with line numbers and fix hints.
                 </p>
-                <div className="flex items-center gap-2">
-                  <span className="border border-amber-saar/20 text-amber-saar font-mono text-xs px-2 py-1 rounded">SA001</span>
-                  <span className="border border-amber-saar/20 text-amber-saar font-mono text-xs px-2 py-1 rounded">SA003</span>
-                  <span className="border border-amber-saar/20 text-amber-saar font-mono text-xs px-2 py-1 rounded">SA004</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {['SA001','SA003','SA004'].map(code => (
+                    <span key={code} className="font-mono text-xs px-2 py-1 rounded text-amber-saar"
+                      style={{ border: '1px solid rgba(244,195,67,0.2)' }}>{code}</span>
+                  ))}
                   <span className="text-cream-dim font-mono text-xs">+2 more</span>
                 </div>
               </div>

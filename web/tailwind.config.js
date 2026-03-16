@@ -9,32 +9,28 @@ export default {
         mono: ['"JetBrains Mono"', 'monospace'],
       },
       colors: {
+        // RGB format so Tailwind opacity modifiers (/20, /50 etc) work
         navy: {
-          950: '#04070F',
-          900: '#080C14',
-          800: '#0D1420',
-          700: '#14202E',
-          600: '#1C2D40',
-          500: '#243650',
+          950: 'rgb(var(--navy-950) / <alpha-value>)',
+          900: 'rgb(var(--navy-900) / <alpha-value>)',
+          800: 'rgb(var(--navy-800) / <alpha-value>)',
+          700: 'rgb(var(--navy-700) / <alpha-value>)',
         },
         amber: {
-          saar: '#F4C343',
-          glow: '#F4C34330',
-          muted: '#F4C34318',
+          saar: 'rgb(var(--amber-saar) / <alpha-value>)',
+          muted: 'rgb(var(--amber-saar) / 0.09)',
+          glow: 'rgb(var(--amber-saar) / 0.15)',
         },
         cream: {
-          DEFAULT: '#E8E3D9',
-          muted: '#9E9A92',
-          dim: '#5A5750',
+          DEFAULT: 'rgb(var(--cream) / <alpha-value>)',
+          muted: 'rgb(var(--cream-muted) / <alpha-value>)',
+          dim: 'rgb(var(--cream-dim) / <alpha-value>)',
         },
-        wrong: '#FF4E4E',
-        right: '#4EFF9A',
       },
       animation: {
         'type-cursor': 'blink 1s step-end infinite',
         'fade-up': 'fadeUp 0.6s ease forwards',
         'fade-in': 'fadeIn 0.4s ease forwards',
-        'slide-right': 'slideRight 0.5s ease forwards',
       },
       keyframes: {
         blink: {
@@ -48,10 +44,6 @@ export default {
         fadeIn: {
           from: { opacity: '0' },
           to: { opacity: '1' },
-        },
-        slideRight: {
-          from: { transform: 'translateX(-8px)', opacity: '0' },
-          to: { transform: 'translateX(0)', opacity: '1' },
         },
       },
     },
