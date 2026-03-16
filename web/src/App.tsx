@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Copy, CheckCircle, GithubLogo, ArrowRight,
-  X, Check, ArrowsLeftRight
+  X, Check, ArrowsLeftRight,
+  Terminal, Stack, ShieldCheck, FileText, Code, Lightning
 } from '@phosphor-icons/react'
 
 // ── Scroll reveal hook ──────────────────────────────────────────────────────
@@ -361,11 +362,15 @@ function HowItWorks() {
 }
 
 // ── What it captures ────────────────────────────────────────────────────────
-function FeatureCard({ label, ex, color }: { icon: null; label: string; ex: string; color: string }) {
+function FeatureCard({ icon: Icon, label, ex }: { icon: React.ElementType; label: string; ex: string }) {
   const r = useReveal()
   return (
     <div ref={r} className="reveal feature-card rounded-xl p-6 group">
-      <div className="w-2 h-2 rounded-full mb-5" style={{ background: color }} />
+      {/* Amber icon on dark navy background — matches the brand */}
+      <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-5"
+        style={{ background: 'rgba(244,195,67,0.1)', border: '1px solid rgba(244,195,67,0.2)' }}>
+        <Icon size={18} weight="duotone" color="rgb(244,195,67)" />
+      </div>
       <p className="text-cream text-sm font-medium mb-2">{label}</p>
       <p className="text-cream-dim font-mono text-xs">{ex}</p>
     </div>
@@ -375,12 +380,12 @@ function FeatureCard({ label, ex, color }: { icon: null; label: string; ex: stri
 function WhatItCaptures() {
   const ref = useReveal()
   const items = [
-    { icon: null, label: 'Package manager', ex: 'bun, pnpm, uv', color: '#F4C343' },
-    { icon: null, label: 'Logging library', ex: 'structlog, winston, pino', color: '#818CF8' },
-    { icon: null, label: 'Auth patterns', ex: 'JwtAuthGuard, Depends(require_auth)', color: '#34D399' },
-    { icon: null, label: 'Naming conventions', ex: 'kebab-case, snake_case', color: '#F472B6' },
-    { icon: null, label: 'Exception classes', ex: '218 custom types, top 10 shown', color: '#FB923C' },
-    { icon: null, label: 'Tribal knowledge', ex: 'Off-limits files, domain terms', color: '#60A5FA' },
+    { icon: Terminal,   label: 'Package manager',    ex: 'bun, pnpm, uv' },
+    { icon: Stack,      label: 'Logging library',     ex: 'structlog, winston, pino' },
+    { icon: ShieldCheck,label: 'Auth patterns',       ex: 'JwtAuthGuard, Depends(require_auth)' },
+    { icon: FileText,   label: 'Naming conventions',  ex: 'kebab-case, snake_case' },
+    { icon: Code,       label: 'Exception classes',   ex: '218 custom types, top 10 shown' },
+    { icon: Lightning,  label: 'Tribal knowledge',    ex: 'Off-limits files, domain terms' },
   ]
   return (
     <section className="py-24 px-6">
