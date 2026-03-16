@@ -24,9 +24,9 @@
 - from __future__ import annotations
 - import logging
 - from saar.models import CodebaseDNA
-- import json
 - import re
 - from typing import Optional
+- import json
 - import os
 - import time
 - from dataclasses import dataclass

@@ -1,7 +1,7 @@
 <!-- SAAR:AUTO-START -->
 # CLAUDE.md -- saar
 
-713 functions, 128 classes.
+756 functions, 137 classes.
 Async adoption: 15%.
 Type hint coverage: 96%.
 
@@ -18,9 +18,9 @@ from pathlib import Path
 from __future__ import annotations
 import logging
 from saar.models import CodebaseDNA
-import json
 import re
 from typing import Optional
+import json
 import os
 import time
 from dataclasses import dataclass
@@ -35,7 +35,7 @@ from dataclasses import dataclass
 These files have the most dependents -- understand them before editing:
 
 - `saar/models.py` (23 dependents)
-- `saar/cli.py` (10 dependents)
+- `saar/cli.py` (11 dependents)
 - `saar/formatters/agents_md.py` (7 dependents)
 - `saar/extractor.py` (6 dependents)
 - `saar/formatters/claude_md.py` (4 dependents)
