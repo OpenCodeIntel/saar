@@ -16,7 +16,7 @@
 
 <br />
 
-[**getsaar.com**](https://getsaar.com) &nbsp;·&nbsp; [**PyPI**](https://pypi.org/project/saar/) &nbsp;·&nbsp; [**Issues**](https://github.com/OpenCodeIntel/saar/issues) &nbsp;·&nbsp; [**OCI**](https://opencodeintel.com)
+[**getsaar.com**](https://getsaar.com) &nbsp;·&nbsp; [**Docs**](https://getsaar.com/docs) &nbsp;·&nbsp; [**PyPI**](https://pypi.org/project/saar/) &nbsp;·&nbsp; [**Issues**](https://github.com/OpenCodeIntel/saar/issues) &nbsp;·&nbsp; [**OCI**](https://opencodeintel.com)
 
 <br />
 
