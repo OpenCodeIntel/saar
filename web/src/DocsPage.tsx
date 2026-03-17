@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { GithubLogo, ArrowLeft, Terminal, Users, Student, GitBranch, Copy, CheckCircle, CaretRight } from '@phosphor-icons/react'
 
-// ── Copy button ──────────────────────────────────────────────────────────────
+// ── Copy button — with label (for code blocks) ───────────────────────────────
 function CopyBtn({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   return (
@@ -10,6 +10,24 @@ function CopyBtn({ text }: { text: string }) {
       className="copy-btn px-2 py-1 rounded text-xs flex items-center gap-1">
       {copied ? <CheckCircle size={11} weight="fill" /> : <Copy size={11} />}
       {copied ? 'copied' : 'copy'}
+    </button>
+  )
+}
+
+// ── Copy icon only — for command rows ────────────────────────────────────────
+function CopyIcon({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      onClick={async () => { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+      title="Copy"
+      className="shrink-0 transition-opacity opacity-40 hover:opacity-100"
+      style={{ color: 'rgb(244,195,67)', background: 'none', border: 'none', padding: '2px', cursor: 'pointer' }}
+    >
+      {copied
+        ? <CheckCircle size={14} weight="fill" />
+        : <Copy size={14} />
+      }
     </button>
   )
 }
@@ -286,9 +304,10 @@ function CommandsSection() {
               {showTag && (
                 <p className="text-amber-saar font-mono text-xs tracking-widest uppercase mt-6 mb-2">{tag}</p>
               )}
-              <div className="feature-card rounded-lg p-3 flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="feature-card rounded-lg p-3 flex items-center gap-3 group">
                 <IC>{cmd}</IC>
-                <span className="text-cream-dim text-xs">{desc}</span>
+                <span className="text-cream-dim text-xs flex-1">{desc}</span>
+                <CopyIcon text={cmd} />
               </div>
             </div>
           )
