@@ -64,17 +64,14 @@ def render_agents_md(dna: CodebaseDNA) -> str:
     if dna.detected_framework:
         lines.append(f"This is a **{dna.detected_framework}** project.\n")
 
-    # -- codebase stats (orientation for the agent) --
-    if dna.total_functions or dna.total_classes:
-        parts = []
-        if dna.total_functions:
-            parts.append(f"{dna.total_functions:,} functions")
+    # -- codebase stats (size orientation only -- async% and type hint% not actionable) --
+    if dna.total_functions:
+        parts = [f"{dna.total_functions:,} functions"]
         if dna.total_classes:
             parts.append(f"{dna.total_classes:,} classes")
-        if dna.async_adoption_pct > 0:
-            parts.append(f"{dna.async_adoption_pct:.0f}% async")
-        if dna.type_hint_pct > 0:
-            parts.append(f"{dna.type_hint_pct:.0f}% type-hinted")
+        total_files = sum(dna.language_distribution.values()) if dna.language_distribution else 0
+        if total_files:
+            parts.append(f"{total_files} files")
         lines.append(", ".join(parts) + ".\n")
 
     # -- language distribution --
@@ -140,11 +137,33 @@ def render_agents_md(dna: CodebaseDNA) -> str:
         lines.append(f"- Files: `{nc.file_style}`")
 
     if dna.common_imports:
-        lines.append("\nPreferred imports:")
-        lines.append("```")
-        for imp in dna.common_imports[:10]:
-            lines.append(imp)
-        lines.append("```")
+        # Only show imports that are project-specific -- skip stdlib and obvious ones.
+        # Generic imports (json, os, re, logging, time) add zero value to an AI:
+        # every Python dev already knows them. Project-specific imports (from saar.models,
+        # from fastapi, from structlog) are the ones that matter.
+        _STDLIB_NOISE = {
+            "import json", "import os", "import re", "import time", "import sys",
+            "import logging", "import math", "import random", "import copy",
+            "import io", "import abc", "import enum", "import uuid",
+            "from __future__ import annotations",
+            "from typing import Optional", "from typing import List",
+            "from typing import Dict", "from typing import Tuple",
+            "from typing import Any", "from typing import Union",
+            "from dataclasses import dataclass", "from pathlib import Path",
+            "from collections import Counter", "from datetime import datetime",
+        }
+        project_imports = [
+            imp for imp in dna.common_imports[:15]
+            if imp.strip() not in _STDLIB_NOISE
+            and not imp.strip().startswith("from typing import")
+            and not imp.strip().startswith("import typing")
+        ]
+        if project_imports:
+            lines.append("\nKey project imports:")
+            lines.append("```")
+            for imp in project_imports[:6]:
+                lines.append(imp)
+            lines.append("```")
 
     # -- logging --
     lp = dna.logging_patterns
