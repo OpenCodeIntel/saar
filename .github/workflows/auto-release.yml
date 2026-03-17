@@ -1,6 +1,6 @@
 name: Auto Release + Publish
 
-# Triggers on every push to main.
+# Triggers AFTER CI passes on main -- never release broken code.
 # If the version in pyproject.toml has no git tag yet, it:
 #   1. Creates the git tag (v0.x.y)
 #   2. Creates a GitHub Release
@@ -8,7 +8,9 @@ name: Auto Release + Publish
 # If the version already has a tag, it does nothing.
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
 
 permissions:
@@ -16,6 +18,8 @@ permissions:
 
 jobs:
   release:
+    # Only run if CI actually passed -- not on failure or cancellation
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
