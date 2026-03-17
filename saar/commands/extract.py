@@ -289,11 +289,13 @@ def _build_summary_rows(dna) -> list[tuple[str, str]]:
         auth = []
         for m in dna.auth_patterns.middleware_used[:2]:
             if m not in seen:
-                auth.append(m); seen.add(m)
+                auth.append(m)
+                seen.add(m)
         for d in dna.auth_patterns.auth_decorators[:3]:
             name = d.split("(")[1].rstrip(")") if "(" in d else d
             if name and name not in seen:
-                auth.append(name); seen.add(name)
+                auth.append(name)
+                seen.add(name)
         if auth:
             rows.append(("Auth", "  ".join(auth)))
 
