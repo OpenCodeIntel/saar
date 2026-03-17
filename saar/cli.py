@@ -996,13 +996,18 @@ def stats(
     grade = result.grade
     project_type = result.project_type
 
-    if score >= 85:
+    # Normalize score to 100 based on actual max for this project type.
+    # A CLI project scoring 88/88 IS 100% -- display it honestly.
+    possible_max = result.coverage_max + 60  # coverage_max + size(20) + freshness(20) + precision(20)
+    display_score = round(score * 100 / possible_max) if possible_max > 0 else score
+
+    if display_score >= 85:
         score_color = "green"
         verdict = "Excellent -- AI will follow this well"
-    elif score >= 70:
+    elif display_score >= 70:
         score_color = "cyan"
         verdict = "Good -- a few improvements would help"
-    elif score >= 50:
+    elif display_score >= 50:
         score_color = "yellow"
         verdict = "Needs work -- missing key sections"
     else:
@@ -1017,17 +1022,17 @@ def stats(
     console.print()
     console.print(
         f"  [bold]saar stats[/bold] — [cyan]{target_file.name}[/cyan]  "
-        f"[{score_color}][bold]{score}/100[/bold][/{score_color}]  "
+        f"[{score_color}][bold]{display_score}/100[/bold][/{score_color}]  "
         f"[dim]({grade})[/dim]{type_hint}"
     )
     console.print(f"  [dim]{verdict}[/dim]")
     console.print()
 
     # ── Score bar ───────────────────────────────────────────────────────────
-    filled = round(score / 5)   # 20 blocks total
+    filled = round(display_score / 5)   # 20 blocks total
     empty = 20 - filled
     bar_color = score_color
-    bar = f"  [{bar_color}]{'█' * filled}[/{bar_color}][dim]{'░' * empty}[/dim]  {score}/100"
+    bar = f"  [{bar_color}]{'█' * filled}[/{bar_color}][dim]{'░' * empty}[/dim]  {display_score}/100"
     console.print(bar)
     console.print()
 
@@ -1097,7 +1102,7 @@ def stats(
     # Share prompt for high scores
     if score >= 80:
         console.print(
-            f"  [dim]Share it: \"My AGENTS.md scored {score}/100 with saar — getsaar.com\"[/dim]"
+            f"  [dim]Share it: \"My AGENTS.md scored {display_score}/100 with saar — getsaar.com\"[/dim]"
         )
         console.print()
 
