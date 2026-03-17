@@ -130,16 +130,18 @@ def write_with_markers(target: Path, generated: str, *, force: bool, console=Non
 
     if not target.exists():
         target.write_text(wrapped, encoding="utf-8")
-        _tok = f"  ~{len(wrapped)//4} tokens" if "AGENTS" in target.name else ""
-        _con.print(f"  [green]wrote[/green] {_display_path(target)}  [dim]({_line_count(wrapped)} lines{_tok})[/dim]")
+        _lines = _line_count(wrapped)
+        _tok = f"  [dim]~{len(wrapped)//4} tokens[/dim]" if "AGENTS" in target.name else ""
+        _con.print(f"  [green]wrote[/green]    {_display_path(target):<32} [dim]{_lines} lines[/dim]{_tok}")
         return
 
     existing = target.read_text(encoding="utf-8")
 
     if force:
         target.write_text(wrapped, encoding="utf-8")
-        _tok = f"  ~{len(wrapped)//4} tokens" if "AGENTS" in target.name else ""
-        _con.print(f"  [green]wrote[/green] {_display_path(target)}  [dim]({_line_count(wrapped)} lines{_tok})[/dim]")
+        _lines = _line_count(wrapped)
+        _tok = f"  [dim]~{len(wrapped)//4} tokens[/dim]" if "AGENTS" in target.name else ""
+        _con.print(f"  [green]wrote[/green]    {_display_path(target):<32} [dim]{_lines} lines[/dim]{_tok}")
         return
 
     start_idx = existing.find(_MARKER_START)
@@ -155,8 +157,9 @@ def write_with_markers(target: Path, generated: str, *, force: bool, console=Non
     after = after.replace(_MARKER_START, "").replace(_MARKER_END, "").lstrip("\n")
     final = before + wrapped + ("\n" + after if after.strip() else "")
     target.write_text(final, encoding="utf-8")
-    _tok = f"  ~{len(final)//4} tokens" if "AGENTS" in target.name else ""
-    _con.print(f"  [green]updated[/green] {_display_path(target)}  [dim]({_line_count(final)} lines, manual edits preserved{_tok})[/dim]")
+    _lines = _line_count(final)
+    _tok = f"  [dim]~{len(final)//4} tokens[/dim]" if "AGENTS" in target.name else ""
+    _con.print(f"  [green]updated[/green]  {_display_path(target):<32} [dim]{_lines} lines[/dim]{_tok}")
 
 
 def _handle_unmarked_file(target: Path, existing: str, wrapped: str, force: bool, console=None) -> None:
@@ -221,6 +224,10 @@ def show_detection_summary(dna, no_interview: bool) -> bool:
 
     Returns True to proceed, False if user says detections are wrong.
     Always returns True in CI / --no-interview mode.
+
+    Design: the Exceptions row is the money shot -- it shows what AI gets wrong
+    without saar (generic ValueError) vs what it now knows (OCIAPIError).
+    Make it visually distinct from the rest of the table.
     """
     from rich.table import Table
 
@@ -231,10 +238,14 @@ def show_detection_summary(dna, no_interview: bool) -> bool:
     rows = _build_summary_rows(dna)
 
     table = Table(show_header=False, box=None, padding=(0, 2))
-    table.add_column(style="dim", width=18)
+    table.add_column(style="dim", width=20)
     table.add_column()
     for label, value in rows:
-        table.add_row(label, f"[cyan]{value}[/cyan]")
+        # Exceptions is the demo moment -- make it stand out
+        if label == "Exceptions":
+            table.add_row(label, f"[bold white]{value}[/bold white]")
+        else:
+            table.add_row(label, f"[cyan]{value}[/cyan]")
     console.print(table)
 
     for warning in getattr(dna, "analysis_warnings", []):
@@ -387,7 +398,7 @@ def cmd_extract(
     import saar as _saar_pkg
     _ver = getattr(_saar_pkg, "__version__", "")
     console.print()
-    console.print(f"  [bold]saar[/bold] [dim]v{_ver}[/dim]  ·  analyzing [bold cyan]{repo_path.name}[/bold cyan]")
+    console.print(f"  [bold]saar[/bold] [dim]v{_ver}[/dim]  [dim]·[/dim]  [bold cyan]{repo_path.name}[/bold cyan]")
     console.print(f"  [dim]{'─' * 44}[/dim]")
     if include:
         console.print(f"  [dim]subset: {' '.join(include)}[/dim]")
@@ -453,22 +464,23 @@ def cmd_extract(
     if index:
         run_oci_indexing(repo_path)
 
-    # -- upgraded closing summary with token count --
-    # Count tokens in AGENTS.md for the summary
+    # -- closing: token count front and center, clean file list --
     _agents_path = (output or repo_path) / "AGENTS.md"
-    _token_note = ""
+    _tokens = 0
     if _agents_path.exists():
         try:
-            _chars = len(_agents_path.read_text(encoding="utf-8"))
-            _tokens = _chars // 4  # ~4 chars/token approximation
-            _token_note = f"  [dim]{_tokens} tokens[/dim]"
+            _tokens = len(_agents_path.read_text(encoding="utf-8")) // 4
         except Exception:
             pass
 
     console.print()
     console.print(f"  [dim]{'─' * 44}[/dim]")
-    console.print(f"  [bold green]Your AI knows your codebase.[/bold green]{_token_note}")
-    console.print("  [dim]Load AGENTS.md before your next Claude session.[/dim]")
+    if _tokens:
+        console.print(f"  [bold green]✓[/bold green]  [bold]~{_tokens} tokens[/bold]  [dim]·  your AI knows your codebase[/dim]")
+    else:
+        console.print("  [bold green]✓[/bold green]  [bold]Your AI knows your codebase.[/bold]")
+    console.print("  [dim]getsaar.com[/dim]")
+    console.print()
 
     # -- post-extract dogfood check: warn on contradictions in tribal knowledge --
     # SA006 catches stale facts like "cli.py is 1514 lines" contradicting "cli.py is 68 lines".
