@@ -24,42 +24,28 @@ def extract_naming_conventions(files: List[Path], read_file: ReadFile) -> Naming
             continue
         if file_path.suffix == ".py":
             for func in re.findall(r"^def\s+(\w+)\s*\(", content, re.MULTILINE):
-                if func.startswith("_"):
-                    continue
-                if "_" in func:
-                    func_styles["snake_case"] += 1
-                elif func[0].islower() and any(c.isupper() for c in func):
-                    func_styles["camelCase"] += 1
+                if func.startswith("_"): continue
+                if "_" in func: func_styles["snake_case"] += 1
+                elif func[0].islower() and any(c.isupper() for c in func): func_styles["camelCase"] += 1
             for cls in re.findall(r"^class\s+(\w+)", content, re.MULTILINE):
-                if cls[0].isupper() and "_" not in cls:
-                    class_styles["PascalCase"] += 1
+                if cls[0].isupper() and "_" not in cls: class_styles["PascalCase"] += 1
             if "_" in file_path.stem and file_path.stem.islower():
                 file_styles["snake_case"] += 1
         elif file_path.suffix in (".js", ".jsx", ".ts", ".tsx"):
             for func in re.findall(r"(?:^|\s)(?:function|const|let|var)\s+(\w+)\s*(?:=\s*(?:async\s*)?\(|[\(<])", content, re.MULTILINE):
-                if not func or func[0].isupper():
-                    continue
-                if func[0].islower() and any(c.isupper() for c in func):
-                    func_styles["camelCase"] += 1
-                elif "_" in func:
-                    func_styles["snake_case"] += 1
+                if not func or func[0].isupper(): continue
+                if func[0].islower() and any(c.isupper() for c in func): func_styles["camelCase"] += 1
+                elif "_" in func: func_styles["snake_case"] += 1
             for cls in re.findall(r"(?:^|\s)(?:class|interface|type)\s+(\w+)", content, re.MULTILINE):
-                if cls[0].isupper() and "_" not in cls:
-                    class_styles["PascalCase"] += 1
+                if cls[0].isupper() and "_" not in cls: class_styles["PascalCase"] += 1
             stem = file_path.stem.replace(".test", "").replace(".spec", "")
-            if "-" in stem:
-                file_styles["kebab-case"] += 1
-            elif stem[0].isupper():
-                file_styles["PascalCase"] += 1
-            elif any(c.isupper() for c in stem):
-                file_styles["camelCase"] += 1
+            if "-" in stem: file_styles["kebab-case"] += 1
+            elif stem[0].isupper(): file_styles["PascalCase"] += 1
+            elif any(c.isupper() for c in stem): file_styles["camelCase"] += 1
 
-    if func_styles:
-        conventions.function_style = func_styles.most_common(1)[0][0]
-    if class_styles:
-        conventions.class_style = class_styles.most_common(1)[0][0]
-    if file_styles:
-        conventions.file_style = file_styles.most_common(1)[0][0]
+    if func_styles: conventions.function_style = func_styles.most_common(1)[0][0]
+    if class_styles: conventions.class_style = class_styles.most_common(1)[0][0]
+    if file_styles: conventions.file_style = file_styles.most_common(1)[0][0]
     conventions.constant_style = "UPPER_SNAKE_CASE"
     return conventions
 
@@ -68,15 +54,12 @@ def extract_common_imports(files: List[Path], read_file: ReadFile) -> List[str]:
     """Find the most frequently used import statements (Python only)."""
     counter: Counter = Counter()
     for file_path in files:
-        if file_path.suffix != ".py":
-            continue
+        if file_path.suffix != ".py": continue
         content = read_file(file_path)
-        if not content:
-            continue
+        if not content: continue
         for imp in re.findall(r"^((?:from\s+[\w.]+\s+)?import\s+[\w., ]+)$", content, re.MULTILINE):
             imp = imp.strip()
-            if imp.endswith("(") or imp.startswith("#") or "from ." in imp:
-                continue
+            if imp.endswith("(") or imp.startswith("#") or "from ." in imp: continue
             counter[imp] += 1
     return [imp for imp, count in counter.most_common(20) if count >= 2]
 
@@ -109,16 +92,13 @@ def extract_test_patterns(app_files: List[Path], test_files: List[Path], repo_pa
     pattern.has_conftest = bool(list(repo_path.rglob("conftest.py")))
     for file_path in app_files + test_files:
         content = read_file(file_path)
-        if not content:
-            continue
+        if not content: continue
         if "import pytest" in content or "@pytest" in content:
             pattern.framework = "pytest"
-            if "@pytest.fixture" in content:
-                pattern.fixture_style = "pytest fixtures"
+            if "@pytest.fixture" in content: pattern.fixture_style = "pytest fixtures"
         elif "from unittest" in content and not pattern.framework:
             pattern.framework = "unittest"
-            if "def setUp(" in content:
-                pattern.fixture_style = "setUp/tearDown"
+            if "def setUp(" in content: pattern.fixture_style = "setUp/tearDown"
         if "from unittest.mock import" in content or "@patch(" in content:
             pattern.mock_library = "unittest.mock"
         elif "pytest_mock" in content or "mocker" in content:

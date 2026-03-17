@@ -48,40 +48,27 @@ def extract_frontend_patterns(repo_path: Path, should_skip: ShouldSkip) -> Optio
             if p.is_dir() and not should_skip(p, repo_path)
         )
 
-    if _has_lockfile("bun.lock") or _has_lockfile("bun.lockb"):
-        fp.package_manager = "bun"
-    elif _has_lockfile("pnpm-lock.yaml"):
-        fp.package_manager = "pnpm"
-    elif _has_lockfile("yarn.lock"):
-        fp.package_manager = "yarn"
-    else:
-        fp.package_manager = "npm"
+    if _has_lockfile("bun.lock") or _has_lockfile("bun.lockb"): fp.package_manager = "bun"
+    elif _has_lockfile("pnpm-lock.yaml"): fp.package_manager = "pnpm"
+    elif _has_lockfile("yarn.lock"): fp.package_manager = "yarn"
+    else: fp.package_manager = "npm"
 
     fp.language = "TypeScript" if ("typescript" in combined or any(k.startswith("@types/") for k in combined)) else "JavaScript"
 
     # UI framework
-    if "next" in combined:
-        fp.framework = "Next.js"
-    elif "nuxt" in combined or "nuxt3" in combined:
-        fp.framework = "Nuxt"
+    if "next" in combined: fp.framework = "Next.js"
+    elif "nuxt" in combined or "nuxt3" in combined: fp.framework = "Nuxt"
     elif "@sveltejs/kit" in combined or "svelte" in combined:
         fp.framework = "SvelteKit" if "@sveltejs/kit" in combined else "Svelte"
-    elif "astro" in combined:
-        fp.framework = "Astro"
-    elif "@angular/core" in combined:
-        fp.framework = "Angular"
-    elif "react" in combined or "react-dom" in combined:
-        fp.framework = "React"
-    elif "vue" in combined:
-        fp.framework = "Vue"
+    elif "astro" in combined: fp.framework = "Astro"
+    elif "@angular/core" in combined: fp.framework = "Angular"
+    elif "react" in combined or "react-dom" in combined: fp.framework = "React"
+    elif "vue" in combined: fp.framework = "Vue"
 
     # build tool
-    if "vite" in combined or "@vitejs/plugin-react" in combined:
-        fp.build_tool = "Vite"
-    elif "turbopack" in combined or ("next" in combined and "webpack" not in combined):
-        fp.build_tool = "Turbopack"
-    elif "webpack" in combined:
-        fp.build_tool = "webpack"
+    if "vite" in combined or "@vitejs/plugin-react" in combined: fp.build_tool = "Vite"
+    elif "turbopack" in combined or ("next" in combined and "webpack" not in combined): fp.build_tool = "Turbopack"
+    elif "webpack" in combined: fp.build_tool = "webpack"
 
     # test framework
     if "vitest" in combined:
@@ -91,53 +78,34 @@ def extract_frontend_patterns(repo_path: Path, should_skip: ShouldSkip) -> Optio
             pm = fp.package_manager or "npm"
             fp.test_command = f"{pm} run test"
     elif "jest" in combined or "@jest/core" in combined:
-        fp.test_framework = "Jest"
-        fp.test_command = "jest"
-    elif "@playwright/test" in combined:
-        fp.test_framework = "Playwright"
-    elif "cypress" in combined:
-        fp.test_framework = "Cypress"
-    elif "mocha" in combined:
-        fp.test_framework = "Mocha"
+        fp.test_framework = "Jest"; fp.test_command = "jest"
+    elif "@playwright/test" in combined: fp.test_framework = "Playwright"
+    elif "cypress" in combined: fp.test_framework = "Cypress"
+    elif "mocha" in combined: fp.test_framework = "Mocha"
 
     # component library
     radix_count = sum(1 for k in combined if k.startswith("@radix-ui/"))
-    if radix_count >= 3:
-        fp.component_library = "shadcn/ui"
-    elif "@mui/material" in combined or "@material-ui/core" in combined:
-        fp.component_library = "Material UI"
-    elif "@chakra-ui/react" in combined:
-        fp.component_library = "Chakra UI"
-    elif "antd" in combined:
-        fp.component_library = "Ant Design"
-    elif "react-bootstrap" in combined:
-        fp.component_library = "React Bootstrap"
-    elif "@mantine/core" in combined:
-        fp.component_library = "Mantine"
+    if radix_count >= 3: fp.component_library = "shadcn/ui"
+    elif "@mui/material" in combined or "@material-ui/core" in combined: fp.component_library = "Material UI"
+    elif "@chakra-ui/react" in combined: fp.component_library = "Chakra UI"
+    elif "antd" in combined: fp.component_library = "Ant Design"
+    elif "react-bootstrap" in combined: fp.component_library = "React Bootstrap"
+    elif "@mantine/core" in combined: fp.component_library = "Mantine"
 
     # state management
-    if "@tanstack/react-query" in combined or "react-query" in combined:
-        fp.state_management = "TanStack Query"
-    elif "zustand" in combined:
-        fp.state_management = "Zustand"
+    if "@tanstack/react-query" in combined or "react-query" in combined: fp.state_management = "TanStack Query"
+    elif "zustand" in combined: fp.state_management = "Zustand"
     elif "@reduxjs/toolkit" in combined or "redux" in combined:
         fp.state_management = "Redux Toolkit" if "@reduxjs/toolkit" in combined else "Redux"
-    elif "jotai" in combined:
-        fp.state_management = "Jotai"
-    elif "valtio" in combined:
-        fp.state_management = "Valtio"
-    elif "recoil" in combined:
-        fp.state_management = "Recoil"
+    elif "jotai" in combined: fp.state_management = "Jotai"
+    elif "valtio" in combined: fp.state_management = "Valtio"
+    elif "recoil" in combined: fp.state_management = "Recoil"
 
     # styling
-    if "tailwindcss" in combined:
-        fp.styling = "Tailwind CSS"
-    elif "styled-components" in combined:
-        fp.styling = "styled-components"
-    elif "@emotion/react" in combined or "@emotion/styled" in combined:
-        fp.styling = "Emotion"
-    elif "sass" in combined or "node-sass" in combined:
-        fp.styling = "Sass/SCSS"
+    if "tailwindcss" in combined: fp.styling = "Tailwind CSS"
+    elif "styled-components" in combined: fp.styling = "styled-components"
+    elif "@emotion/react" in combined or "@emotion/styled" in combined: fp.styling = "Emotion"
+    elif "sass" in combined or "node-sass" in combined: fp.styling = "Sass/SCSS"
 
     if fp.framework in ("React", "Next.js"):
         _detect_react_patterns(fp, repo_path, should_skip)
@@ -184,12 +152,9 @@ def _detect_react_patterns(fp: FrontendPattern, repo_path: Path, should_skip: Sh
                 if imp.startswith("use"):
                     custom_hook_imports[imp] = custom_hook_imports.get(imp, 0) + 1
 
-    if use_query_count >= 2:
-        fp.uses_react_query = True
-    if fetch_in_effect_count == 0 and use_query_count >= 2:
-        fp.avoids_fetch_in_effect = True
-    if cn_usage_count >= 3:
-        fp.uses_cn_utility = True
+    if use_query_count >= 2: fp.uses_react_query = True
+    if fetch_in_effect_count == 0 and use_query_count >= 2: fp.avoids_fetch_in_effect = True
+    if cn_usage_count >= 3: fp.uses_cn_utility = True
     if hook_files:
         fp.has_custom_hooks = True
         if custom_hook_imports:

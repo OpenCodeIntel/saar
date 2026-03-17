@@ -188,26 +188,19 @@ def extract_database_patterns(files: List[Path], repo_path: Path, read_file: Rea
             continue
 
         if file_path.suffix == ".sql":
-            if "gen_random_uuid()" in content:
-                pattern.id_type = "UUID (gen_random_uuid())"
-            elif "SERIAL" in content:
-                pattern.id_type = "SERIAL"
-            if "TIMESTAMPTZ" in content:
-                pattern.timestamp_type = "TIMESTAMPTZ"
-            elif "TIMESTAMP" in content:
-                pattern.timestamp_type = "TIMESTAMP"
-            if "ENABLE ROW LEVEL SECURITY" in content:
-                pattern.has_rls = True
-            if "ON DELETE CASCADE" in content:
-                pattern.cascade_deletes = True
+            if "gen_random_uuid()" in content: pattern.id_type = "UUID (gen_random_uuid())"
+            elif "SERIAL" in content: pattern.id_type = "SERIAL"
+            if "TIMESTAMPTZ" in content: pattern.timestamp_type = "TIMESTAMPTZ"
+            elif "TIMESTAMP" in content: pattern.timestamp_type = "TIMESTAMP"
+            if "ENABLE ROW LEVEL SECURITY" in content: pattern.has_rls = True
+            if "ON DELETE CASCADE" in content: pattern.cascade_deletes = True
             continue
 
         if file_path.suffix != ".py":
             continue
 
         if re.search(r"^from supabase\b|^import supabase\b", content, re.MULTILINE):
-            if not pattern.orm_used:
-                pattern.orm_used = "Supabase"
+            if not pattern.orm_used: pattern.orm_used = "Supabase"
             if "get_supabase_service()" in content:
                 pattern.connection_pattern = "Singleton: get_supabase_service()"
             elif "create_client(" in content and not pattern.connection_pattern:
@@ -215,14 +208,10 @@ def extract_database_patterns(files: List[Path], repo_path: Path, read_file: Rea
 
         if re.search(r"^from django\.db import models", content, re.MULTILINE):
             pattern.orm_used = "Django ORM"
-            if "models.UUIDField" in content:
-                pattern.id_type = "UUID (Django UUIDField)"
-            elif "models.AutoField" in content or "models.BigAutoField" in content:
-                pattern.id_type = "AutoField (Django)"
-            if "models.DateTimeField" in content:
-                pattern.timestamp_type = "DateTimeField (Django)"
-            if "on_delete=models.CASCADE" in content:
-                pattern.cascade_deletes = True
+            if "models.UUIDField" in content: pattern.id_type = "UUID (Django UUIDField)"
+            elif "models.AutoField" in content or "models.BigAutoField" in content: pattern.id_type = "AutoField (Django)"
+            if "models.DateTimeField" in content: pattern.timestamp_type = "DateTimeField (Django)"
+            if "on_delete=models.CASCADE" in content: pattern.cascade_deletes = True
 
         if re.search(r"^from django", content, re.MULTILINE) or re.search(r"^import django\b", content, re.MULTILINE):
             if "DATABASES" in content and not pattern.connection_pattern:
@@ -231,34 +220,25 @@ def extract_database_patterns(files: List[Path], repo_path: Path, read_file: Rea
                 pattern.orm_used = "Django ORM"
 
         if re.search(r"^from sqlalchemy\b", content, re.MULTILINE):
-            if not pattern.orm_used:
-                pattern.orm_used = "SQLAlchemy"
-            if "UUID" in content:
-                pattern.id_type = "UUID (SQLAlchemy)"
-            if "DateTime" in content:
-                pattern.timestamp_type = "DateTime (SQLAlchemy)"
-            if "create_engine(" in content:
-                pattern.connection_pattern = "SQLAlchemy: create_engine()"
+            if not pattern.orm_used: pattern.orm_used = "SQLAlchemy"
+            if "UUID" in content: pattern.id_type = "UUID (SQLAlchemy)"
+            if "DateTime" in content: pattern.timestamp_type = "DateTime (SQLAlchemy)"
+            if "create_engine(" in content: pattern.connection_pattern = "SQLAlchemy: create_engine()"
 
         if re.search(r"^from tortoise\b|^from tortoise\.models\b", content, re.MULTILINE):
-            if not pattern.orm_used:
-                pattern.orm_used = "Tortoise ORM"
+            if not pattern.orm_used: pattern.orm_used = "Tortoise ORM"
 
         if re.search(r"^from mongoengine\b|^import mongoengine\b", content, re.MULTILINE):
-            if not pattern.orm_used:
-                pattern.orm_used = "MongoEngine"
+            if not pattern.orm_used: pattern.orm_used = "MongoEngine"
 
         if re.search(r"^from motor\b|^import motor\b", content, re.MULTILINE):
-            if not pattern.orm_used:
-                pattern.orm_used = "Motor (async MongoDB)"
+            if not pattern.orm_used: pattern.orm_used = "Motor (async MongoDB)"
 
     for file_path in files:
-        if file_path.suffix not in (".js", ".ts", ".tsx", ".jsx"):
-            continue
+        if file_path.suffix not in (".js", ".ts", ".tsx", ".jsx"): continue
         content = read_file(file_path)
         if content and re.search(r"^import\b.*@prisma/client", content, re.MULTILINE):
-            if not pattern.orm_used:
-                pattern.orm_used = "Prisma"
+            if not pattern.orm_used: pattern.orm_used = "Prisma"
             break
 
     return pattern
@@ -269,14 +249,11 @@ def extract_middleware_patterns(files: List[Path], framework: Optional[str], rea
     patterns: List[str] = []
     for file_path in files:
         content = read_file(file_path)
-        if not content:
-            continue
+        if not content: continue
         for match in re.finditer(r"^class\s+(\w*Middleware\w*)", content, re.MULTILINE):
             patterns.append(match.group(1))
-        if "app.add_middleware" in content:
-            patterns.append("app.add_middleware()")
-        if "app.use(" in content:
-            patterns.append("app.use(middleware)")
+        if "app.add_middleware" in content: patterns.append("app.add_middleware()")
+        if "app.use(" in content: patterns.append("app.use(middleware)")
         if "MIDDLEWARE" in content and "django" in content.lower():
             for mw in re.findall(r"['\"][\w.]*Middleware[\w.]*['\"]", content)[:3]:
                 patterns.append(mw.strip("'\"").split(".")[-1])
