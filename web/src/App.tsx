@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Copy, CheckCircle, GithubLogo, ArrowRight,
   X, Check, ArrowsLeftRight,
@@ -51,6 +52,10 @@ function Nav() {
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <span className="font-serif italic text-xl text-amber-saar tracking-tight">saar</span>
         <div className="flex items-center gap-6">
+          <Link to="/docs"
+            className="text-cream-muted hover:text-cream text-sm transition-colors">
+            Docs
+          </Link>
           <a href="https://github.com/OpenCodeIntel/saar" target="_blank" rel="noopener noreferrer"
             className="text-cream-muted hover:text-cream text-sm transition-colors flex items-center gap-2">
             <GithubLogo size={15} weight="fill" />
