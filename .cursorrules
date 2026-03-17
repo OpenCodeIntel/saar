@@ -20,14 +20,14 @@
 
 ## Common Imports
 
-- from pathlib import Path
 - from __future__ import annotations
-- import logging
-- from saar.models import CodebaseDNA
+- from pathlib import Path
 - import re
 - from typing import Optional
+- import logging
+- from saar.models import CodebaseDNA
 - import json
 - import os
-- import time
-- from dataclasses import dataclass
+- import typer
+- from rich.console import Console
 <!-- SAAR:AUTO-END -->

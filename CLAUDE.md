@@ -1,10 +1,16 @@
 <!-- SAAR:AUTO-START -->
 # CLAUDE.md -- saar
 
-756 functions, 137 classes.
-Async adoption: 15%.
-Type hint coverage: 96%.
+808 functions, 137 classes.
+Async adoption: 14%.
+Type hint coverage: 85%.
 
+
+## Frontend
+
+**Stack:** React + TypeScript + Vite
+- Package manager: `bun` -- always use `bun install`, never npm/yarn
+- Styling: Tailwind CSS -- no raw CSS files
 ## Coding Conventions
 
 - Use `snake_case` for function names
@@ -14,16 +20,16 @@ Type hint coverage: 96%.
 
 Preferred imports:
 ```
-from pathlib import Path
 from __future__ import annotations
-import logging
-from saar.models import CodebaseDNA
+from pathlib import Path
 import re
 from typing import Optional
+import logging
+from saar.models import CodebaseDNA
 import json
 import os
-import time
-from dataclasses import dataclass
+import typer
+from rich.console import Console
 ```
 
 ## Logging
@@ -34,31 +40,22 @@ from dataclasses import dataclass
 
 These files have the most dependents -- understand them before editing:
 
-- `saar/models.py` (23 dependents)
-- `saar/cli.py` (11 dependents)
+- `saar/models.py` (27 dependents)
+- `saar/cli.py` (10 dependents)
+- `saar/extractor.py` (8 dependents)
 - `saar/formatters/agents_md.py` (7 dependents)
-- `saar/extractor.py` (6 dependents)
-- `saar/formatters/claude_md.py` (4 dependents)
+- `saar/interview.py` (5 dependents)
+- `saar/differ.py` (5 dependents)
 - `saar/formatters/_tribal.py` (4 dependents)
-- `saar/interview.py` (3 dependents)
-- `saar/differ.py` (3 dependents)
+- `saar/formatters/claude_md.py` (4 dependents)
 
 ## Error Handling
 
 - Use existing exceptions: `OCIAPIError, OCIAuthError`
 - Always log exceptions before re-raising
 
-## Testing
 
-- Framework: pytest
-- Test file pattern: `test_*.py`
-- Fixture style: pytest fixtures
-- Mock with: unittest.mock
-- Shared fixtures live in `conftest.py`
-- Run: `pytest tests/ -v`
-
-
-> [20 lines omitted -- run `saar extract --verbose` for full output]
+> [33 lines omitted -- run `saar extract --verbose` for full output]
 ## Tribal Knowledge
 
 *Captured via `saar` interview -- human knowledge static analysis cannot detect.*
@@ -76,6 +73,10 @@ These files have the most dependents -- understand them before editing:
 - benchmark/ contains OPE-99 results -- never delete benchmark_results.json or benchmark_report.md
 - saar has NO web auth -- ignore any detected Depends(reusable_oauth2), it is a false positive from test fixtures
 - Always run ruff check saar/ tests/ before committing -- CI will fail on F541 (f-string without placeholders) and other lint errors. Run: source venv/bin/activate && ruff check saar/ tests/ && pytest tests/ -q
+- saar/cli.py is now 68 lines -- command logic lives in saar/commands/ (extract, maintain, quality, explore)
+- saar/extractor.py is now 621 lines -- pattern logic lives in saar/extractors/ (backend, conventions, frontend, project)
+- Never add command logic to cli.py -- it only registers app.command() calls
+- Never add extraction logic to extractor.py -- DNAExtractor delegates to saar/extractors/ modules via self._safe_read_file
 
 ### Domain Vocabulary
 
