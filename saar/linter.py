@@ -19,6 +19,10 @@ Rule codes:
   SA005  Emoji in rules -- emojis consume tokens and don't add meaning.
          ETH Zurich: every wasted token in a context file reduces instruction follow.
 
+  SA006  Contradictory rules -- two lines make opposing claims about the same fact.
+         e.g. "cli.py is 1514 lines" and "cli.py is now 68 lines" in the same file.
+         The AI will follow one and violate the other. Remove the stale one.
+
 Design principles:
   - Zero false positives is more important than catching everything.
   - Every violation must be immediately actionable (has a fix hint).
@@ -78,6 +82,7 @@ def lint_agents_md(content: str) -> list[LintViolation]:
     violations.extend(_check_sa003_vague_rules(lines))
     violations.extend(_check_sa004_generic_filler(lines))
     violations.extend(_check_sa005_emojis(lines))
+    violations.extend(_check_sa006_contradictions(lines))
 
     return sorted(violations, key=lambda v: v.line)
 
@@ -259,6 +264,65 @@ def _check_sa005_emojis(lines: list[str]) -> list[LintViolation]:
                 fix="Remove the emoji; the text should stand on its own",
                 severity="warning",
             ))
+
+    return violations
+
+
+def _check_sa006_contradictions(lines: list[str]) -> list[LintViolation]:
+    """SA006: Two lines make opposing claims about the same measurable fact.
+
+    Only flags lines that contain explicit size/count claims using specific
+    keywords (lines, tests, functions). Avoids false positives from
+    dependency counts, percentages, or unrelated numbers.
+    """
+    import re
+
+    violations = []
+
+    # Only match explicit factual claims with these keywords.
+    # Pattern: "X is N lines", "N tests must pass", "X has N functions"
+    # Deliberately narrow to avoid false positives from (N dependents), percentages etc.
+    _CLAIM_PATTERN = re.compile(
+        r'(\b[\w./]+(?:\.py|\.ts|\.tsx|\.js)?\b)'  # entity: file or keyword
+        r'.{0,30}?'                                   # up to 30 chars between
+        r'\b(\d{2,})\b'                               # number (2+ digits)
+        r'.{0,20}?'                                   # up to 20 chars after
+        r'\b(lines|tests|functions|classes)\b',       # unit keyword
+        re.IGNORECASE,
+    )
+
+    entity_claims: dict[str, list] = {}
+
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip().lstrip("- *")
+        for match in _CLAIM_PATTERN.finditer(stripped):
+            entity = match.group(1).lower()
+            number = int(match.group(2))
+            unit = match.group(3).lower()
+            key = f"{entity}:{unit}"  # entity+unit must match, not just entity
+            if key not in entity_claims:
+                entity_claims[key] = []
+            entity_claims[key].append((i, number, line.rstrip()))
+
+    for key, claims in entity_claims.items():
+        if len(claims) < 2:
+            continue
+        numbers = set(c[1] for c in claims)
+        if len(numbers) == 1:
+            continue
+
+        sorted_claims = sorted(claims, key=lambda c: c[0])
+        first_line_num, first_num, _ = sorted_claims[0]
+        last_num = sorted_claims[-1][1]
+        entity, unit = key.split(":", 1)
+
+        violations.append(LintViolation(
+            line=first_line_num,
+            code="SA006",
+            message=f"Contradictory claim: `{entity}` described as {first_num} {unit} here, but {last_num} {unit} on line {sorted_claims[-1][0]}",
+            fix=f"Remove this line -- the later claim (line {sorted_claims[-1][0]}) is likely correct",
+            severity="error",
+        ))
 
     return violations
 

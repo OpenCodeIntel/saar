@@ -1,7 +1,7 @@
 <!-- SAAR:AUTO-START -->
 # CLAUDE.md -- saar
 
-808 functions, 137 classes.
+809 functions, 137 classes.
 Async adoption: 14%.
 Type hint coverage: 85%.
 
@@ -54,8 +54,12 @@ These files have the most dependents -- understand them before editing:
 - Use existing exceptions: `OCIAPIError, OCIAuthError`
 - Always log exceptions before re-raising
 
+## Circular Dependencies (fix these)
 
-> [33 lines omitted -- run `saar extract --verbose` for full output]
+- `saar/commands/extract.py` <-> `saar/commands/extract.py`
+
+
+> [29 lines omitted -- run `saar extract --verbose` for full output]
 ## Tribal Knowledge
 
 *Captured via `saar` interview -- human knowledge static analysis cannot detect.*
@@ -64,19 +68,15 @@ These files have the most dependents -- understand them before editing:
 
 ### Never Do
 
-- Always run tests inside venv: source venv/bin/activate && pytest tests/ -v -- system Python missing typer causes 4 collection errors
-- 499 tests must pass before any commit
-- Push directly to OpenCodeIntel/saar main (no fork). Never commit venv/ dist/ __pycache__
+- Always run tests inside venv: `source venv/bin/activate && pytest tests/ -q` -- system Python missing typer causes collection errors
+- 548 tests must pass before any commit
+- Never push directly to OpenCodeIntel/saar main. Never commit venv/ dist/ __pycache__
 - Never add external infrastructure dependencies (no Supabase, Redis, network calls in core path)
-- saar/cli.py is 1514 lines -- extract helpers to separate modules, never add more logic directly
-- extractor.py is 1579 lines -- all methods share self._file_cache, never break this when adding languages
+- Never add command logic to cli.py -- it only registers app.command() calls. Logic goes in saar/commands/
+- Never add extraction logic to extractor.py -- DNAExtractor delegates to saar/extractors/ modules
 - benchmark/ contains OPE-99 results -- never delete benchmark_results.json or benchmark_report.md
-- saar has NO web auth -- ignore any detected Depends(reusable_oauth2), it is a false positive from test fixtures
-- Always run ruff check saar/ tests/ before committing -- CI will fail on F541 (f-string without placeholders) and other lint errors. Run: source venv/bin/activate && ruff check saar/ tests/ && pytest tests/ -q
-- saar/cli.py is now 68 lines -- command logic lives in saar/commands/ (extract, maintain, quality, explore)
-- saar/extractor.py is now 621 lines -- pattern logic lives in saar/extractors/ (backend, conventions, frontend, project)
-- Never add command logic to cli.py -- it only registers app.command() calls
-- Never add extraction logic to extractor.py -- DNAExtractor delegates to saar/extractors/ modules via self._safe_read_file
+- saar has NO web auth -- any detected Depends(reusable_oauth2) is a false positive from test fixtures
+- Always run `ruff check saar/ tests/ && pytest tests/ -q` before committing
 
 ### Domain Vocabulary
 
@@ -87,7 +87,7 @@ These files have the most dependents -- understand them before editing:
 
 ### Verification Workflow
 
-source venv/bin/activate && pytest tests/ -v -- all 499 tests must pass. Then: saar extract . --no-interview to verify CLI output is clean
+`source venv/bin/activate && pytest tests/ -q` -- 548 tests must pass. Then: `saar extract . --no-interview` to verify CLI output is clean
 
 ### Off-Limits Files
 

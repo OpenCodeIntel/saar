@@ -446,3 +446,22 @@ def cmd_extract(
 
     console.print()
     console.print("  [bold green]Claude knows your project.[/bold green]  [dim]Drop AGENTS.md in your repo root — it's picked up automatically.[/dim]")
+
+    # -- post-extract dogfood check: warn on contradictions in tribal knowledge --
+    # SA006 catches stale facts like "cli.py is 1514 lines" contradicting "cli.py is 68 lines".
+    # We only surface errors (contradictions), not style warnings -- keep the signal clean.
+    try:
+        from saar.linter import lint_file
+        agents_file = (output or repo_path) / "AGENTS.md"
+        if agents_file.exists():
+            violations = [v for v in lint_file(agents_file) if v.severity == "error"]
+            if violations:
+                console.print()
+                console.print("  [yellow]Stale facts detected in tribal knowledge:[/yellow]")
+                for v in violations[:3]:
+                    console.print(f"  [dim]  line {v.line}:[/dim] {v.message}")
+                    if v.fix:
+                        console.print(f"  [dim]  fix: {v.fix}[/dim]")
+                console.print("  [dim]Run [bold]saar lint .[/bold] for full details.[/dim]")
+    except Exception:
+        pass  # lint failure must never break extract
