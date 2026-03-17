@@ -37,7 +37,8 @@ def extract_config_patterns(files: List[Path], repo_path: Path, read_file: ReadF
     pattern = ConfigPattern()
     for file_path in files:
         content = read_file(file_path)
-        if not content: continue
+        if not content:
+            continue
         if re.search(r"^from dotenv import|^load_dotenv\b", content, re.MULTILINE):
             pattern.env_loading = "python-dotenv"
         elif re.search(r"^from decouple import", content, re.MULTILINE):
@@ -98,22 +99,29 @@ def extract_verify_workflow(repo_path: Path, read_file: ReadFile) -> Optional[st
     for candidate in [repo_path / "package.json", repo_path / "frontend" / "package.json",
                        repo_path / "web" / "package.json", repo_path / "app" / "package.json",
                        repo_path / "apps" / "web" / "package.json"]:
-        if not candidate.exists(): continue
+        if not candidate.exists():
+            continue
         try:
             data = _json.loads(candidate.read_text(encoding="utf-8"))
         except Exception:
             break
         scripts = data.get("scripts", {})
         parent = candidate.parent
-        if (parent / "bun.lock").exists() or (parent / "bun.lockb").exists(): pm = "bun"
-        elif (parent / "pnpm-lock.yaml").exists(): pm = "pnpm"
-        elif (parent / "yarn.lock").exists(): pm = "yarn"
-        else: pm = "npm"
+        if (parent / "bun.lock").exists() or (parent / "bun.lockb").exists():
+            pm = "bun"
+        elif (parent / "pnpm-lock.yaml").exists():
+            pm = "pnpm"
+        elif (parent / "yarn.lock").exists():
+            pm = "yarn"
+        else:
+            pm = "npm"
         for key in ("typecheck", "type-check", "test", "lint", "build"):
             if key in scripts and scripts[key]:
                 cmd = f"{pm} run {key}"
-                if cmd not in js_steps: js_steps.append(cmd)
-                if len(js_steps) >= 3: break
+                if cmd not in js_steps:
+                    js_steps.append(cmd)
+                if len(js_steps) >= 3:
+                    break
         break
     if js_steps:
         steps.append(f"Frontend: `{'` then `'.join(js_steps)}`")
@@ -161,7 +169,8 @@ def extract_project_structure(repo_path: Path, active_skip_dirs: set, should_ski
         return count
 
     def _build_tree(directory: Path, prefix: str = "", depth: int = 0) -> list[str]:
-        if depth > 3: return []
+        if depth > 3:
+            return []
         lines = []
         try:
             children = sorted([c for c in directory.iterdir() if c.is_dir()], key=lambda p: p.name)
