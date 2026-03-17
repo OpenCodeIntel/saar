@@ -75,8 +75,10 @@ def cmd_stats(
     console.print()
 
     def _pts_fmt(earned: int, max_pts: int) -> str:
-        if earned == max_pts: return f"[green]{earned}[/green]"
-        if earned >= max_pts * 0.6: return f"[yellow]{earned}[/yellow]"
+        if earned == max_pts:
+            return f"[green]{earned}[/green]"
+        if earned >= max_pts * 0.6:
+            return f"[yellow]{earned}[/yellow]"
         return f"[red]{earned}[/red]"
 
     table = Table(show_header=True, box=box.SIMPLE, padding=(0, 2))
