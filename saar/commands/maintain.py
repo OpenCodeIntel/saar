@@ -52,8 +52,8 @@ def cmd_add(
         field, label = "never_do", "Never do"
 
     append_to_cache(repo_path, field, correction)
-    console.print(f"  [green]added[/green] [{label}] {correction}")
-    console.print("  [dim]Saved to .saar/config.json. Re-run [bold]saar .[/bold] to regenerate context files.[/dim]")
+    console.print(f"  [green]Added[/green]  [{label}] {correction}")
+    console.print("  [dim]Saved to .saar/config.json. Re-run [bold]saar .[/bold] to regenerate.[/dim]")
 
 
 def cmd_diff(
@@ -75,7 +75,7 @@ def cmd_diff(
         console.print("[yellow]No snapshot found.[/yellow] Run [bold]saar extract[/bold] first to create a baseline.")
         raise typer.Exit(code=0)
 
-    console.print(f"[bold]saar[/bold] checking [cyan]{repo_path.name}[/cyan] for changes...")
+    console.print(f"  [bold]saar[/bold] checking [bold]{repo_path.name}[/bold] for changes...")
 
     extractor = DNAExtractor()
     dna = extractor.extract(str(repo_path))
@@ -129,5 +129,5 @@ def cmd_enrich(
         return
 
     save_cache(repo_path, enriched)
-    console.print("[bold green]done[/bold green] -- tribal knowledge enriched and saved.")
-    console.print("[dim]Re-run [bold]saar extract .[/bold] --no-interview to regenerate context files.[/dim]")
+    console.print("  [bold green]Done.[/bold green]  Tribal knowledge enriched and saved.")
+    console.print("  [dim]Re-run [bold]saar extract . --no-interview[/bold] to regenerate context files.[/dim]")

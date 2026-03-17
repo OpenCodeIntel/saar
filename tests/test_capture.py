@@ -187,7 +187,7 @@ class TestCaptureCLI:
             "--no-regen",
         ])
         assert result.exit_code == 0
-        assert "captured" in result.output
+        assert "Captured" in result.output or "captured" in result.output
         # check capture was saved
         entries = load_captures(tmp_path)
         assert len(entries) == 1
