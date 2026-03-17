@@ -103,13 +103,22 @@ def _detect_project_type(content: str, repo_path: Optional["Path"] = None) -> st
                 scripts = data.get("scripts", {})
                 has_start = bool(scripts.get("start") or scripts.get("serve"))
                 has_exports = bool(data.get("main") or data.get("exports") or data.get("module"))
-                is_scoped = name.startswith("@")  # e.g. @storybook/..., @babel/...
+                is_scoped = name.startswith("@")
 
                 if data.get("bin"):
                     return "cli"
-                # library: scoped package, or has exports but no start script
                 if (is_scoped and not has_start) or (has_exports and not has_start):
                     return "library"
+        except Exception:
+            pass
+
+        # pyproject.toml with [project.scripts] = definitive CLI evidence
+        try:
+            pyproject = repo_path / "pyproject.toml"
+            if pyproject.exists():
+                pyproject_text = pyproject.read_text(encoding="utf-8")
+                if "[project.scripts]" in pyproject_text:
+                    return "cli"
         except Exception:
             pass
 
@@ -121,8 +130,8 @@ def _detect_project_type(content: str, repo_path: Optional["Path"] = None) -> st
         return "library"
     if web_score >= 2:
         return "web_app"
-    # only classify as cli from content if very strong signal and no web evidence
-    if cli_score >= 3 and web_score == 0:
+    # cli: >= 1 signal is enough when there's zero web evidence
+    if cli_score >= 1 and web_score == 0:
         return "cli"
     return "unknown"
 
