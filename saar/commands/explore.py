@@ -53,7 +53,7 @@ def cmd_init(
     target.write_text(content, encoding="utf-8")
     line_count = len(content.splitlines())
     console.print()
-    console.print(f"  [green]wrote[/green] {target}  ({line_count} lines)")
+    console.print(f"  [green]Wrote[/green]  {target}  [dim]({line_count} lines)[/dim]")
     console.print()
     console.print("  [bold]Next steps:[/bold]")
     console.print("  [dim]1.[/dim] Drop this in your repo root — Claude Code + Cursor pick it up automatically")
@@ -183,10 +183,10 @@ def cmd_capture(
     append_to_cache(repo_path, field_name, rule)
 
     if is_duplicate:
-        console.print(f"  [yellow]captured again[/yellow] [{label}] {rule}  [dim](×{entry.count} total)[/dim]")
+        console.print(f"  [yellow]Captured again[/yellow]  [{label}] {rule}  [dim](×{entry.count} total)[/dim]")
         console.print(f"  [dim]Claude has made this mistake {entry.count} times. Rule already in AGENTS.md.[/dim]")
     else:
-        console.print(f"  [green]captured[/green] [{label}] {rule}")
+        console.print(f"  [green]Captured[/green]  [{label}] {rule}")
 
     if no_regen:
         console.print("  [dim]Skipped regeneration (--no-regen). Run [bold]saar extract . --no-interview[/bold] to update.[/dim]")

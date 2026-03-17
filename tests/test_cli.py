@@ -98,7 +98,7 @@ class TestCLI:
         runner.invoke(app, ["extract", str(tmp_repo), "--format", "claude", "-o", str(output_dir)])
         result = runner.invoke(app, ["extract", str(tmp_repo), "--format", "claude", "-o", str(output_dir)])
         assert result.exit_code == 0
-        assert "updated" in result.stdout or "wrote" in result.stdout
+        assert "Updated" in result.stdout or "Wrote" in result.stdout
 
     def test_force_overwrites(self, tmp_repo: Path, tmp_path: Path):
         """--force does a clean overwrite."""
@@ -107,7 +107,7 @@ class TestCLI:
         runner.invoke(app, ["extract", str(tmp_repo), "--format", "claude", "-o", str(output_dir)])
         result = runner.invoke(app, ["extract", str(tmp_repo), "--format", "claude", "--force", "-o", str(output_dir)])
         assert result.exit_code == 0
-        assert "overwrote" in result.stdout or "wrote" in result.stdout
+        assert "Wrote" in result.stdout or "Updated" in result.stdout
 
 
 class TestPreservationMarkers:

@@ -321,7 +321,7 @@ class TestSaarAddCommand:
         runner = CliRunner()
         result = runner.invoke(app, ["add", "Never modify billing/", "--repo", str(tmp_path)])
         assert result.exit_code == 0
-        assert "added" in result.stdout
+        assert "Added" in result.stdout or "added" in result.stdout
         cached = load_cached(tmp_path)
         assert cached is not None
         assert "Never modify billing/" in cached.never_do
