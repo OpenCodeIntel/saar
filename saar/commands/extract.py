@@ -130,14 +130,16 @@ def write_with_markers(target: Path, generated: str, *, force: bool, console=Non
 
     if not target.exists():
         target.write_text(wrapped, encoding="utf-8")
-        _con.print(f"  [green]wrote[/green] {_display_path(target)}  [dim]({_line_count(wrapped)} lines)[/dim]")
+        _tok = f"  ~{len(wrapped)//4} tokens" if "AGENTS" in target.name else ""
+        _con.print(f"  [green]wrote[/green] {_display_path(target)}  [dim]({_line_count(wrapped)} lines{_tok})[/dim]")
         return
 
     existing = target.read_text(encoding="utf-8")
 
     if force:
         target.write_text(wrapped, encoding="utf-8")
-        _con.print(f"  [green]wrote[/green] {_display_path(target)}  [dim]({_line_count(wrapped)} lines)[/dim]")
+        _tok = f"  ~{len(wrapped)//4} tokens" if "AGENTS" in target.name else ""
+        _con.print(f"  [green]wrote[/green] {_display_path(target)}  [dim]({_line_count(wrapped)} lines{_tok})[/dim]")
         return
 
     start_idx = existing.find(_MARKER_START)
@@ -153,7 +155,8 @@ def write_with_markers(target: Path, generated: str, *, force: bool, console=Non
     after = after.replace(_MARKER_START, "").replace(_MARKER_END, "").lstrip("\n")
     final = before + wrapped + ("\n" + after if after.strip() else "")
     target.write_text(final, encoding="utf-8")
-    _con.print(f"  [green]updated[/green] {_display_path(target)}  [dim]({_line_count(final)} lines, manual edits preserved)[/dim]")
+    _tok = f"  ~{len(final)//4} tokens" if "AGENTS" in target.name else ""
+    _con.print(f"  [green]updated[/green] {_display_path(target)}  [dim]({_line_count(final)} lines, manual edits preserved{_tok})[/dim]")
 
 
 def _handle_unmarked_file(target: Path, existing: str, wrapped: str, force: bool, console=None) -> None:
@@ -381,7 +384,11 @@ def cmd_extract(
     logging.basicConfig(level=logging.DEBUG if verbose else logging.WARNING, format="%(message)s")
     effective_budget = 0 if verbose else budget
 
-    console.print(f"[bold]saar[/bold] analyzing [cyan]{repo_path.name}[/cyan]...")
+    import saar as _saar_pkg
+    _ver = getattr(_saar_pkg, "__version__", "")
+    console.print()
+    console.print(f"  [bold]saar[/bold] [dim]v{_ver}[/dim]  ·  analyzing [bold cyan]{repo_path.name}[/bold cyan]")
+    console.print(f"  [dim]{'─' * 44}[/dim]")
     if include:
         console.print(f"  [dim]subset: {' '.join(include)}[/dim]")
 
@@ -446,8 +453,22 @@ def cmd_extract(
     if index:
         run_oci_indexing(repo_path)
 
+    # -- upgraded closing summary with token count --
+    # Count tokens in AGENTS.md for the summary
+    _agents_path = (output or repo_path) / "AGENTS.md"
+    _token_note = ""
+    if _agents_path.exists():
+        try:
+            _chars = len(_agents_path.read_text(encoding="utf-8"))
+            _tokens = _chars // 4  # ~4 chars/token approximation
+            _token_note = f"  [dim]{_tokens} tokens[/dim]"
+        except Exception:
+            pass
+
     console.print()
-    console.print("  [bold green]Claude knows your project.[/bold green]  [dim]Drop AGENTS.md in your repo root — it's picked up automatically.[/dim]")
+    console.print(f"  [dim]{'─' * 44}[/dim]")
+    console.print(f"  [bold green]Your AI knows your codebase.[/bold green]{_token_note}")
+    console.print("  [dim]Load AGENTS.md before your next Claude session.[/dim]")
 
     # -- post-extract dogfood check: warn on contradictions in tribal knowledge --
     # SA006 catches stale facts like "cli.py is 1514 lines" contradicting "cli.py is 68 lines".

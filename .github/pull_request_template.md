@@ -4,8 +4,8 @@
 
 ## Why?
 
-<!-- Why is this change needed? Link the issue. -->
-<!-- Closes #ISSUE_NUMBER -->
+<!-- Why is this change needed? -->
+<!-- Closes OPE-XXX  ← add Linear issue here, auto-closes on merge -->
 
 ## Type of change
 
