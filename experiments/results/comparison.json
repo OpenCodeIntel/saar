@@ -1,0 +1,23 @@
+[
+  {
+    "agent": "UCB Bandit",
+    "mean_reward": 0.5253861173555249,
+    "std_reward": 0.20824789420777504,
+    "pct_optimal": 55.00000000000001,
+    "n_episodes": 100
+  },
+  {
+    "agent": "REINFORCE",
+    "mean_reward": 0.4933861173555249,
+    "std_reward": 0.20113414769563923,
+    "pct_optimal": 47.0,
+    "n_episodes": 100
+  },
+  {
+    "agent": "Random",
+    "mean_reward": 0.34538611735552494,
+    "std_reward": 0.12964157478603483,
+    "pct_optimal": 10.0,
+    "n_episodes": 100
+  }
+]
