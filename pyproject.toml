@@ -47,6 +47,9 @@ enrich = [
     # AI post-processing of interview answers -- requires ANTHROPIC_API_KEY
     "anthropic>=0.80.0",
 ]
+rl = [
+    "numpy>=1.24.0",
+]
 
 [project.scripts]
 saar = "saar.cli:app"

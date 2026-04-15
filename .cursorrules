@@ -22,12 +22,12 @@
 
 - from __future__ import annotations
 - from pathlib import Path
-- import re
-- from typing import Optional
 - import logging
-- from saar.models import CodebaseDNA
+- from typing import Optional
 - import json
+- import re
+- from saar.models import CodebaseDNA
+- import numpy as np
+- from dataclasses import dataclass
 - import os
-- import typer
-- from rich.console import Console
 <!-- SAAR:AUTO-END -->

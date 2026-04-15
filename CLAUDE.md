@@ -1,9 +1,9 @@
 <!-- SAAR:AUTO-START -->
 # CLAUDE.md -- saar
 
-809 functions, 137 classes.
-Async adoption: 14%.
-Type hint coverage: 85%.
+914 functions, 153 classes.
+Async adoption: 10%.
+Type hint coverage: 84%.
 
 
 ## Frontend
@@ -22,14 +22,14 @@ Preferred imports:
 ```
 from __future__ import annotations
 from pathlib import Path
-import re
-from typing import Optional
 import logging
-from saar.models import CodebaseDNA
+from typing import Optional
 import json
+import re
+from saar.models import CodebaseDNA
+import numpy as np
+from dataclasses import dataclass
 import os
-import typer
-from rich.console import Console
 ```
 
 ## Logging
@@ -40,26 +40,17 @@ from rich.console import Console
 
 These files have the most dependents -- understand them before editing:
 
-- `saar/models.py` (27 dependents)
+- `saar/models.py` (33 dependents)
 - `saar/cli.py` (10 dependents)
-- `saar/extractor.py` (8 dependents)
+- `saar/extractor.py` (9 dependents)
+- `saar/rl/action_space.py` (8 dependents)
+- `saar/rl/agents/reinforce.py` (7 dependents)
+- `saar/rl/agents/ucb_bandit.py` (7 dependents)
 - `saar/formatters/agents_md.py` (7 dependents)
-- `saar/interview.py` (5 dependents)
-- `saar/differ.py` (5 dependents)
-- `saar/formatters/_tribal.py` (4 dependents)
-- `saar/formatters/claude_md.py` (4 dependents)
-
-## Error Handling
-
-- Use existing exceptions: `OCIAPIError, OCIAuthError`
-- Always log exceptions before re-raising
-
-## Circular Dependencies (fix these)
-
-- `saar/commands/extract.py` <-> `saar/commands/extract.py`
+- `saar/rl/policy_store.py` (5 dependents)
 
 
-> [29 lines omitted -- run `saar extract --verbose` for full output]
+> [42 lines omitted -- run `saar extract --verbose` for full output]
 ## Tribal Knowledge
 
 *Captured via `saar` interview -- human knowledge static analysis cannot detect.*
@@ -77,6 +68,12 @@ These files have the most dependents -- understand them before editing:
 - benchmark/ contains OPE-99 results -- never delete benchmark_results.json or benchmark_report.md
 - saar has NO web auth -- any detected Depends(reusable_oauth2) is a false positive from test fixtures
 - Always run `ruff check saar/ tests/ && pytest tests/ -q` before committing
+- test rule for demo
+- test mistake
+- test rule audit
+- test capture audit
+- never import from saar.extractor directly
+- used npm instead of bun
 
 ### Domain Vocabulary
 

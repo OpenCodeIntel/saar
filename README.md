@@ -391,6 +391,91 @@ If you're building a feature, open an issue first. Saves everyone time.
 
 ---
 
+## RL Module — Adaptive Profile Learning
+
+saar includes a self-contained reinforcement learning layer that learns **which extraction profile best fits each codebase type** — entirely offline, no external dependencies beyond `numpy`.
+
+### Install
+
+```bash
+pip install "saar[rl]"   # adds numpy>=1.24.0
+```
+
+### Quick start
+
+```bash
+# 1. Train both agents offline (500 synthetic episodes each, ~0.2s)
+saar rl train --agent both
+
+# 2. Check training results
+saar rl status
+
+# 3. Run extraction with RL profile selection + online update
+saar extract . --rl
+
+# 4. Give explicit feedback to improve the policy
+saar rate good   # or: saar rate bad
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     saar RL Layer                           │
+│                                                             │
+│  CodebaseDNA ──► StateEncoder (20-D) ──► EnsembleAgent     │
+│                                               │             │
+│                              ┌────────────────┴──────────┐  │
+│                              │  Thompson Sampling Meta    │  │
+│                              │  Beta(α,β) per sub-agent   │  │
+│                              └──────┬──────────┬──────────┘  │
+│                                     │          │             │
+│                            UCBBandit│    REINFORCE│          │
+│                            6-context│    20→32→8 │          │
+│                            UCB1     │    MLP+ReLU│          │
+│                                     │          │             │
+│                              ◄──────┴──────────┘            │
+│                           action (profile 0–7)              │
+│                                     │                       │
+│            PROFILES[action] ──► RewardEngine                │
+│            (depth multipliers)   (section coverage ×        │
+│                                   multipliers → reward)     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### The 8 profiles
+
+| # | Name | Prioritises |
+|---|------|-------------|
+| 0 | Python backend | auth, database, services, middleware |
+| 1 | TypeScript / React | frontend, naming, imports |
+| 2 | Full-stack balanced | api, frontend |
+| 3 | Small script | naming, imports |
+| 4 | Monorepo | services, tests, config |
+| 5 | API microservice | api, auth, middleware, errors |
+| 6 | Data / ML | imports, naming, config, logging |
+| 7 | Legacy / mixed | errors, logging, database |
+
+### How the RL loop closes
+
+1. `StateEncoder` maps `CodebaseDNA` → 20-D feature vector (language mix, framework flags, scale, tribal richness)
+2. `EnsembleAgent` selects a profile via Thompson Sampling
+3. `RewardEngine` scores the DNA weighted by that profile's depth multipliers — so a Data/ML profile scores higher on import-rich codebases than on auth-heavy ones
+4. The selected sub-agent and the meta-agent update online
+5. Policy persists to `~/.saar/rl/` for the next run
+
+### Offline evaluation
+
+```bash
+python experiments/train_ucb.py        # 500 episodes, saves learning curve
+python experiments/train_reinforce.py  # 500 episodes, saves baseline curve
+python experiments/eval_comparison.py  # 95% bootstrap CI + Welch t-test
+```
+
+Results: UCB and REINFORCE each achieve **≥50% oracle-optimal** vs **10% random** (p < 0.05, Welch t-test). The Ensemble reaches the highest mean reward by dynamically routing between them.
+
+---
+
 ## Why I built this
 
 I'm Devanshu, MS Software Engineering at Northeastern, solo founder building this in the open.

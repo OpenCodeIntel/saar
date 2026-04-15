@@ -25,6 +25,7 @@ from saar.commands.extract import (  # noqa: F401 -- re-exported for backward co
 from saar.commands.maintain import cmd_add, cmd_diff, cmd_enrich
 from saar.commands.quality import cmd_stats, cmd_check, cmd_lint
 from saar.commands.explore import cmd_init, cmd_scan, cmd_capture, cmd_replay
+from saar.commands.rl_commands import rl_app, cmd_rate
 
 console = Console()
 
@@ -66,3 +67,5 @@ app.command(name="init")(cmd_init)
 app.command(name="scan")(cmd_scan)
 app.command(name="capture")(cmd_capture)
 app.command(name="replay")(cmd_replay)
+app.add_typer(rl_app, name="rl")
+app.command(name="rate")(cmd_rate)

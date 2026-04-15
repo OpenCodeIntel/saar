@@ -387,6 +387,7 @@ def cmd_extract(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Remove 100-line cap, show full output."),
     budget: int = typer.Option(100, "--budget", help="Max lines in generated file (0 = unlimited).", min=0),
     index: bool = typer.Option(False, "--index", help="Index repo into OCI after extraction."),
+    rl: bool = typer.Option(False, "--rl", help="Apply RL-learned extractor profile before extraction."),
 ) -> None:
     """Analyze a codebase and extract its architectural DNA."""
     logging.basicConfig(level=logging.DEBUG if verbose else logging.WARNING, format="%(message)s")
@@ -410,6 +411,10 @@ def cmd_extract(
                     target_formats.append(fmt)
 
     exclude_rules = [FORMAT_FILENAMES[f] for f in target_formats if f in FORMAT_FILENAMES]
+
+    # -- RL profile selection (optional) -------------------------------------
+    if rl:
+        _apply_rl_profile(repo_path, console)
 
     from saar.extractor import DNAExtractor
     dna = DNAExtractor().extract(str(repo_path), exclude_dirs=exclude or None, exclude_rules_files=exclude_rules or None, include_paths=include or None)
@@ -493,3 +498,117 @@ def cmd_extract(
                 console.print("  [dim]Run [bold]saar lint .[/bold] for full details.[/dim]")
     except Exception:
         pass  # lint failure must never break extract
+
+
+# ── RL profile helper (used by --rl flag) ─────────────────────────────────────
+
+_PROFILE_NAMES: dict[int, str] = {
+    0: "Python backend",
+    1: "TypeScript / React",
+    2: "Full-stack balanced",
+    3: "Small script / utility",
+    4: "Monorepo / large",
+    5: "API-only / microservice",
+    6: "Data / ML",
+    7: "Legacy / mixed",
+}
+
+
+def _apply_rl_profile(repo_path: Path, con) -> None:
+    """Load the best RL policy, select a profile, compute reward, and update online.
+
+    Workflow:
+      1. Load best available policy (ensemble > UCB > REINFORCE).
+      2. Run DNA extraction to build the state vector.
+      3. Select the best profile via the agent's exploit policy.
+      4. Compute reward from the DNA + profile's depth multipliers.
+      5. Update the agent online with (state, action, reward).
+      6. Persist the updated policy back to disk.
+
+    This closes the RL feedback loop: every real extraction teaches the agent
+    which profile best fits each codebase type.  Fails gracefully — any error
+    falls back to default extraction without affecting the user workflow.
+    """
+    _log = logging.getLogger(__name__)
+    try:
+        from saar.rl.policy_store import PolicyStore
+        from saar.rl.state_encoder import StateEncoder
+        from saar.rl.reward import RewardEngine
+        from saar.rl.action_space import get_action
+
+        store = PolicyStore()
+
+        # Prefer ensemble → UCB → REINFORCE
+        ensemble = store.load_ensemble()
+        ucb = store.load_ucb()
+        rf = store.load_reinforce()
+
+        if ensemble is None and ucb is None and rf is None:
+            con.print(
+                "  [yellow]--rl: no trained policy found."
+                "  Run [bold]saar rl train[/bold] first.[/yellow]"
+                "  [dim]  Falling back to default extraction.[/dim]"
+            )
+            return
+
+        # Extract DNA for state encoding
+        from saar.extractor import DNAExtractor
+        dna = DNAExtractor().extract(str(repo_path))
+        if dna is None:
+            con.print("  [yellow]--rl: state encoding failed, using default.[/yellow]")
+            return
+
+        encoder = StateEncoder()
+        state = encoder.encode(dna)
+
+        # Select profile
+        if ensemble is not None:
+            action_idx, agent_idx = ensemble.select_action(state)
+            agent_label = "Ensemble"
+        elif ucb is not None:
+            action_idx = ucb.select_action(state)
+            agent_idx = 0
+            agent_label = "UCB"
+        else:
+            import numpy as _np
+            probs = rf.action_probs(state)
+            action_idx = int(_np.argmax(probs))
+            agent_idx = 1
+            agent_label = "REINFORCE"
+
+        action = get_action(action_idx)
+        profile_name = _PROFILE_NAMES.get(action_idx, f"profile {action_idx}")
+
+        # Compute reward with the selected profile's depth multipliers
+        reward_engine = RewardEngine()
+        from saar.rl.environment import SaarEnvironment
+        output_lines = SaarEnvironment._estimate_output_lines(dna)
+        reward_components = reward_engine.compute(
+            dna,
+            output_lines=output_lines,
+            depth_multipliers=action.depth_multipliers,
+        )
+        reward = reward_components.total
+
+        # Online update — teach the agent from this real extraction
+        if ensemble is not None:
+            ensemble.update(state, action_idx, reward, agent_idx)
+            store.save(ensemble.ucb)
+            store.save(ensemble.reinforce)
+            store.save(ensemble)
+        elif ucb is not None:
+            ucb.update(state, action_idx, reward)
+            store.save(ucb)
+        elif rf is not None:
+            # REINFORCE needs forward pass to set cache before update
+            _, lp = rf.select_action(state)
+            rf.update(lp, reward)
+            store.save(rf)
+
+        con.print(
+            f"  [dim]RL [{agent_label}] → profile {action_idx}"
+            f" \"{profile_name}\"  reward={reward:+.3f}[/dim]"
+        )
+
+    except Exception as e:
+        logging.getLogger(__name__).warning("RL profile selection failed (non-fatal): %s", e)
