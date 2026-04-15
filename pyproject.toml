@@ -42,6 +42,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-cov>=5.0.0",
     "ruff>=0.5.0",
+    "numpy>=1.24.0",
 ]
 enrich = [
     # AI post-processing of interview answers -- requires ANTHROPIC_API_KEY
