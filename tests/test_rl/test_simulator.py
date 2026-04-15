@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from saar.rl.action_space import N_ACTIONS
-from saar.rl.simulator import Episode, SaarSimulator
+from saar.rl.simulator import SaarSimulator
 
 
 class TestSaarSimulator:
