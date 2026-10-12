@@ -6,7 +6,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/saar.svg?color=F4C343&labelColor=0D1420&style=flat-square)](https://pypi.org/project/saar/)
 [![Downloads](https://img.shields.io/pypi/dm/saar.svg?label=downloads&labelColor=0D1420&color=4EFF9A&style=flat-square)](https://pypi.org/project/saar/)
-[![Tests](https://img.shields.io/badge/tests-548%20passing-4EFF9A?labelColor=0D1420&style=flat-square)](https://github.com/OpenCodeIntel/saar/actions)
+[![Tests](https://img.shields.io/badge/tests-635%20passing-4EFF9A?labelColor=0D1420&style=flat-square)](https://github.com/OpenCodeIntel/saar/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-818CF8?labelColor=0D1420&style=flat-square)](./LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-60A5FA?labelColor=0D1420&style=flat-square)](https://www.python.org/downloads/)
 
@@ -376,7 +376,7 @@ cd saar
 python -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
 
-pytest tests/ -v        # 548 tests
+pytest tests/ -v        # 635 tests
 ruff check saar/ tests/ # lint
 
 # verify saar on itself
@@ -472,13 +472,13 @@ python experiments/train_reinforce.py  # 500 episodes, saves baseline curve
 python experiments/eval_comparison.py  # 95% bootstrap CI + Welch t-test
 ```
 
-Results: UCB and REINFORCE each achieve **≥50% oracle-optimal** vs **10% random** (p < 0.05, Welch t-test). The Ensemble reaches the highest mean reward by dynamically routing between them.
+Results in [`experiments/results/comparison.json`](experiments/results/comparison.json) (100 episodes each): UCB picked the oracle-optimal action **55%** of the time and REINFORCE **47%**, against **10%** for random. These are small runs; rerun `eval_comparison.py` for confidence intervals.
 
 ---
 
 ## Why I built this
 
-I'm Devanshu, MS Software Engineering at Northeastern, solo founder building this in the open.
+I'm [Devanshu Chicholikar](https://www.devanshuchicholikar.com), a software engineer in Boston, and I build saar in the open.
 
 I got tired of AI tools that sounded smart but didn't know my project. Every session: wrong package manager, wrong exception class, wrong import. The fix was obvious: give the AI a context file. The problem was nobody maintained those files, they went stale, and most were full of generic filler the AI already knew.
 

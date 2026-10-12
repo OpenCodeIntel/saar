@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "saar"
-version = "0.6.0"
+version = "0.6.1"
 description = "Extract the essence of your codebase. Auto-generate AGENTS.md, CLAUDE.md, .cursorrules and more."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "OpenCodeIntel", email = "dev@getsaar.com" },
+    { name = "Devanshu Chicholikar", email = "dev@getsaar.com" },
 ]
 keywords = [
     "ai", "codebase", "static-analysis", "claude", "cursor",
@@ -57,6 +57,7 @@ saar = "saar.cli:app"
 
 [project.urls]
 Homepage = "https://getsaar.com"
+Author = "https://www.devanshuchicholikar.com"
 Repository = "https://github.com/OpenCodeIntel/saar"
 Issues = "https://github.com/OpenCodeIntel/saar/issues"
 
