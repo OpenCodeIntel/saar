@@ -312,7 +312,7 @@ Exits `0` if AGENTS.md is fresh and complete. Exits `1` with a specific message 
 
 ---
 
-## OCI — semantic search via MCP
+## OCI: semantic search via MCP
 
 saar generates your AGENTS.md. [OpenCodeIntel (OCI)](https://opencodeintel.com) indexes your codebase for per-task context via MCP.
 
@@ -340,11 +340,11 @@ Instead of exploring 30k tokens of files, Claude gets the exact 3 files and 2 ru
 
 ## What saar detects
 
-**Python** — FastAPI / Flask / Django, auth middleware and decorators, logging library, exception class hierarchy, ORM patterns, naming conventions
+**Python**: FastAPI / Flask / Django, auth middleware and decorators, logging library, exception class hierarchy, ORM patterns, naming conventions
 
-**TypeScript/JS** — React / Next.js / Express, package manager (bun / pnpm / npm / yarn), TanStack Query / SWR patterns, component library, custom hooks, common imports
+**TypeScript/JS**: React / Next.js / Express, package manager (bun / pnpm / npm / yarn), TanStack Query / SWR patterns, component library, custom hooks, common imports
 
-**Both** — critical files (most depended-on), circular dependencies, canonical examples per category, existing team rules (reads CLAUDE.md, .cursorrules, CONVENTIONS.md)
+**Both**: critical files (most depended-on), circular dependencies, canonical examples per category, existing team rules (reads CLAUDE.md, .cursorrules, CONVENTIONS.md)
 
 ---
 
@@ -391,9 +391,9 @@ If you're building a feature, open an issue first. Saves everyone time.
 
 ---
 
-## RL Module — Adaptive Profile Learning
+## RL module: adaptive profile learning
 
-saar includes a self-contained reinforcement learning layer that learns **which extraction profile best fits each codebase type** — entirely offline, no external dependencies beyond `numpy`.
+saar includes a self-contained reinforcement learning layer that learns **which extraction profile best fits each codebase type**, entirely offline, no external dependencies beyond `numpy`.
 
 ### Install
 
@@ -435,7 +435,7 @@ saar rate good   # or: saar rate bad
 │                            UCB1     │    MLP+ReLU│          │
 │                                     │          │             │
 │                              ◄──────┴──────────┘            │
-│                           action (profile 0–7)              │
+│                           action (profile 0-7)              │
 │                                     │                       │
 │            PROFILES[action] ──► RewardEngine                │
 │            (depth multipliers)   (section coverage ×        │
@@ -460,7 +460,7 @@ saar rate good   # or: saar rate bad
 
 1. `StateEncoder` maps `CodebaseDNA` → 20-D feature vector (language mix, framework flags, scale, tribal richness)
 2. `EnsembleAgent` selects a profile via Thompson Sampling
-3. `RewardEngine` scores the DNA weighted by that profile's depth multipliers — so a Data/ML profile scores higher on import-rich codebases than on auth-heavy ones
+3. `RewardEngine` scores the DNA weighted by that profile's depth multipliers, so a Data/ML profile scores higher on import-rich codebases than on auth-heavy ones
 4. The selected sub-agent and the meta-agent update online
 5. Policy persists to `~/.saar/rl/` for the next run
 
