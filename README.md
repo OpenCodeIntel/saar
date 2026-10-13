@@ -6,7 +6,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/saar.svg?color=F4C343&labelColor=0D1420&style=flat-square)](https://pypi.org/project/saar/)
 [![Downloads](https://img.shields.io/pypi/dm/saar.svg?label=downloads&labelColor=0D1420&color=4EFF9A&style=flat-square)](https://pypi.org/project/saar/)
-[![Tests](https://img.shields.io/badge/tests-548%20passing-4EFF9A?labelColor=0D1420&style=flat-square)](https://github.com/OpenCodeIntel/saar/actions)
+[![Tests](https://img.shields.io/badge/tests-635%20passing-4EFF9A?labelColor=0D1420&style=flat-square)](https://github.com/OpenCodeIntel/saar/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-818CF8?labelColor=0D1420&style=flat-square)](./LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-60A5FA?labelColor=0D1420&style=flat-square)](https://www.python.org/downloads/)
 
@@ -312,7 +312,7 @@ Exits `0` if AGENTS.md is fresh and complete. Exits `1` with a specific message 
 
 ---
 
-## OCI — semantic search via MCP
+## OCI: semantic search via MCP
 
 saar generates your AGENTS.md. [OpenCodeIntel (OCI)](https://opencodeintel.com) indexes your codebase for per-task context via MCP.
 
@@ -340,11 +340,11 @@ Instead of exploring 30k tokens of files, Claude gets the exact 3 files and 2 ru
 
 ## What saar detects
 
-**Python** — FastAPI / Flask / Django, auth middleware and decorators, logging library, exception class hierarchy, ORM patterns, naming conventions
+**Python**: FastAPI / Flask / Django, auth middleware and decorators, logging library, exception class hierarchy, ORM patterns, naming conventions
 
-**TypeScript/JS** — React / Next.js / Express, package manager (bun / pnpm / npm / yarn), TanStack Query / SWR patterns, component library, custom hooks, common imports
+**TypeScript/JS**: React / Next.js / Express, package manager (bun / pnpm / npm / yarn), TanStack Query / SWR patterns, component library, custom hooks, common imports
 
-**Both** — critical files (most depended-on), circular dependencies, canonical examples per category, existing team rules (reads CLAUDE.md, .cursorrules, CONVENTIONS.md)
+**Both**: critical files (most depended-on), circular dependencies, canonical examples per category, existing team rules (reads CLAUDE.md, .cursorrules, CONVENTIONS.md)
 
 ---
 
@@ -376,7 +376,7 @@ cd saar
 python -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
 
-pytest tests/ -v        # 548 tests
+pytest tests/ -v        # 635 tests
 ruff check saar/ tests/ # lint
 
 # verify saar on itself
@@ -391,9 +391,9 @@ If you're building a feature, open an issue first. Saves everyone time.
 
 ---
 
-## RL Module — Adaptive Profile Learning
+## RL module: adaptive profile learning
 
-saar includes a self-contained reinforcement learning layer that learns **which extraction profile best fits each codebase type** — entirely offline, no external dependencies beyond `numpy`.
+saar includes a self-contained reinforcement learning layer that learns **which extraction profile best fits each codebase type**, entirely offline, no external dependencies beyond `numpy`.
 
 ### Install
 
@@ -435,7 +435,7 @@ saar rate good   # or: saar rate bad
 │                            UCB1     │    MLP+ReLU│          │
 │                                     │          │             │
 │                              ◄──────┴──────────┘            │
-│                           action (profile 0–7)              │
+│                           action (profile 0-7)              │
 │                                     │                       │
 │            PROFILES[action] ──► RewardEngine                │
 │            (depth multipliers)   (section coverage ×        │
@@ -460,7 +460,7 @@ saar rate good   # or: saar rate bad
 
 1. `StateEncoder` maps `CodebaseDNA` → 20-D feature vector (language mix, framework flags, scale, tribal richness)
 2. `EnsembleAgent` selects a profile via Thompson Sampling
-3. `RewardEngine` scores the DNA weighted by that profile's depth multipliers — so a Data/ML profile scores higher on import-rich codebases than on auth-heavy ones
+3. `RewardEngine` scores the DNA weighted by that profile's depth multipliers, so a Data/ML profile scores higher on import-rich codebases than on auth-heavy ones
 4. The selected sub-agent and the meta-agent update online
 5. Policy persists to `~/.saar/rl/` for the next run
 
@@ -472,13 +472,13 @@ python experiments/train_reinforce.py  # 500 episodes, saves baseline curve
 python experiments/eval_comparison.py  # 95% bootstrap CI + Welch t-test
 ```
 
-Results: UCB and REINFORCE each achieve **≥50% oracle-optimal** vs **10% random** (p < 0.05, Welch t-test). The Ensemble reaches the highest mean reward by dynamically routing between them.
+Results in [`experiments/results/comparison.json`](experiments/results/comparison.json) (100 episodes each): UCB picked the oracle-optimal action **55%** of the time and REINFORCE **47%**, against **10%** for random. These are small runs; rerun `eval_comparison.py` for confidence intervals.
 
 ---
 
 ## Why I built this
 
-I'm Devanshu, MS Software Engineering at Northeastern, solo founder building this in the open.
+I'm [Devanshu Chicholikar](https://www.devanshuchicholikar.com), a software engineer in Boston, and I build saar in the open.
 
 I got tired of AI tools that sounded smart but didn't know my project. Every session: wrong package manager, wrong exception class, wrong import. The fix was obvious: give the AI a context file. The problem was nobody maintained those files, they went stale, and most were full of generic filler the AI already knew.
 
